@@ -1,534 +1,313 @@
 import * as THREE from "three";
 import WebGL from "three/addons/capabilities/WebGL.js";
-import { AmmoPhysics } from "three/addons/physics/AmmoPhysics.js";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import Stats from "stats.js";
+import init from "./init";
+import { log } from "three/nodes";
 
-// Variables
-let SCREEN_WIDTH = window.innerWidth;
-let SCREEN_HEIGHT = window.innerHeight;
+const { sizes, camera, scene, canvas, controls, renderer, clock } = init();
+let models = [];
+let mixers = [];
+let idleAction, walkAction;
+let skeleton = null;
+let isWalking = true;
 
-let stats;
-let camera, scene, renderer, controls;
 
-let model, skeleton, mixer, clock;
-const crossFadeControls = [];
+let frames = 0, prevTime = performance.now();
 
-// Массив для хранения боксов
-let boxesRed = [];
-let boxesBlue = [];
-let physics, position;
+// Initialize variables for tracking FPS
+let lastFrameTime = performance.now();
 
-const mixers = [],
-  objects = [];
+// FPS tracking interval (in milliseconds)
+const fpsInterval = 1000; // 1 second
 
-let wall1, wall2, wall3, wall4;
+let stats = new Stats();
+document.body.appendChild(stats.dom);
 
-let currentBaseAction = "idle";
-const allActions = [];
-const baseActions = {
-  idle: { weight: 1 },
-  walk: { weight: 0 },
-  run: { weight: 0 },
+camera.position.z = 0;
+camera.position.x = 0;
+camera.position.y = 35;
+
+// // Define the number of times to load the model
+const numberOfModels = 5;
+let modelsLoaded = 0;
+//
+
+// // Load the same model multiple times using a for loop
+for (let i = 0; i < numberOfModels; i++) {
+  loadModel("assets/models/Xbot.glb");
+}
+
+const renderLoop = () => {
+  // FPS
+
+  let fps = 0;
+  frames ++;
+  const time = performance.now();
+
+  if ( time >= prevTime + 1000 ) {
+    fps =  Math.round( ( frames * 1000 ) / ( time - prevTime ) );
+    frames = 0;
+    prevTime = time;
+
+  }
+
+  console.log("FPS: ", fps);
+
+  if (fps >= 30) {
+    loadModel("assets/models/Xbot.glb");
+  }
 };
-let panelSettings, numAnimations;
 
-// Переменные для управления движением и анимацией
-let movementSpeed = 0.1; // Скорость перемещения объекта
+const animate = () => {
+  stats.begin();
+  controls.update();
+  const delta = clock.getDelta();
+
+  // Call renderLoop to handle FPS tracking and model rendering
+  // renderLoop();
+
+  // Call moveModelsTowardsEachOther to update the positions of the models
+  if (models.length !== 0) {
+    moveModelsTowardsEachOther(delta);
+  }
+
+  if (mixers) {
+    for (const mixer of mixers) mixer.update(delta);
+  }
+
+  renderer.render(scene, camera);
+  stats.end();
+  window.requestAnimationFrame(animate);
+};
 
 if (WebGL.isWebGLAvailable()) {
-    init();
-    animate();
+  init();
+  animate();
 } else {
   const warning = WebGL.getWebGLErrorMessage();
   document.getElementById("app").appendChild(warning);
 }
-
-async function init() {
-  // Создание рендерера
-  renderer = new THREE.WebGLRenderer();
-  renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-  document.getElementById("app").appendChild(renderer.domElement);
-
-  physics = await AmmoPhysics();
-  // position = new THREE.Vector3();
-
-  // CAMERA
-  camera = new THREE.PerspectiveCamera(
-    75,
-    SCREEN_WIDTH / SCREEN_HEIGHT,
-    0.1,
-    1000,
-  );
-  // END CAMERA
-
-  // SCENE
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x999999);
-
-  // Создаем оси XYZ
-  const axesHelper = new THREE.AxesHelper(5); // Длина осей - 5 единиц
-  scene.add(axesHelper);
-
-  const light = new THREE.DirectionalLight(0xffffff, 3);
-  light.position.set(0.5, 1.0, 0.5).normalize();
-
-  scene.add(light);
-
-  camera = new THREE.PerspectiveCamera(
-    35,
-    window.innerWidth / window.innerHeight,
-    1,
-    3500,
-  );
-
-  camera.position.y = 10;
-  camera.position.z = -25;
-
-  scene.add(camera);
-  // Вызов функции для создания боксов и сохранение их в массиве
-  createBoxes();
-  // scene.add(boxes);
-
-  controls = new OrbitControls(camera, renderer.domElement);
-  // controls.minDistance = 1;
-  // controls.maxDistance = 25;
-
-  clock = new THREE.Clock();
-
-  const grid = new THREE.GridHelper(60, 50, 0xffffff, 0x7b7b7b);
-  scene.add(grid);
-
-  // Создаем загрузчик текстур
-  const textureLoader = new THREE.TextureLoader();
-
-  // Загружаем изображение для текстуры
-  textureLoader.load(
-    "assets/textures/grasslight-big.jpg",
-    function (texture) {
-      // Создаем материал с текстурой
-      const planeMaterial = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.DoubleSide,
-      });
-
-      // Создаем геометрию для пола
-      const planeGeometry = new THREE.PlaneGeometry(60, 60, 32, 32);
-
-      // Создаем меш пола, используя геометрию и материал
-      const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-
-      // Поворачиваем пол, чтобы он был параллелен плоскости XZ
-      planeMesh.rotation.x = -Math.PI / 2;
-
-      // Позиционируем пол, например, чтобы он находился внизу сцены
-      planeMesh.position.y = 0;
-
-      // Добавляем пол на сцену
-      scene.add(planeMesh);
-    },
-    undefined,
-    function (error) {
-      console.error("Ошибка загрузки текстуры", error);
-    },
-  );
-
-  // Создаем геометрию и материал для стен
-  const wallGeometry = new THREE.BoxGeometry(55, 5, 1); // Ширина, высота, толщина стены
-  const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 });
-
-  // Создаем стены и устанавливаем их позиции
-  wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
-  wall1.position.set(0, 2.5, -25); // Позиция стены 1
-
-  wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
-  wall2.position.set(0, 2.5, 25); // Позиция стены 2
-
-  wall3 = new THREE.Mesh(wallGeometry, wallMaterial);
-  wall3.position.set(-25, 2.5, 0); // Позиция стены 3
-  wall3.rotation.y = Math.PI / 2; // Поворот на 90 градусов
-
-  wall4 = new THREE.Mesh(wallGeometry, wallMaterial);
-  wall4.position.set(25, 2.5, 0); // Позиция стены 4
-  wall4.rotation.y = Math.PI / 2; // Поворот на 90 градусов
-
-  // Добавляем стены на сцену
-  // scene.add(wall1);
-  // scene.add(wall2);
-  // scene.add(wall3);
-  // scene.add(wall4);
-
-  /////// * /////////// * /////////// * CHARACTER * /////////// *
-
-  // Загружаем несколько экземпляров модели
-  for (let i = 0; i < 3; i++) {
-    // loadModel();
-  }
-
-  // loadModel();
-
-  // END SCENE
-
-  // STATS
-  stats = new Stats();
-  document.body.appendChild(stats.dom);
-
-  /////// * /////////// * /////////// * CHARACTER * /////////// *
-
-  // END SCENE
-
-  createPanel();
-
-  physics.addScene( scene );
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  render();
-
-  stats.update();
-}
-function render() {
-  if (mixer) {
-    // mixer.update(clock.getDelta());
-    // for (const mixer of mixers) mixer.update(clock.getDelta());
-  }
-
-  // console.log(model, 'model');
-
-  if (model) {
-    // Перемещаем объект (например, персонажа)
-    // model.userData.previousPosition.copy(object.position);
-    // Проверяем столкновения с объектами
-    // checkCollisions(model);
-  }
-
-  // Статическая скорость притяжения
-  const attractionSpeed = 1;
-
-  // Притягивание красных и синих блоков друг к другу
-  // Примерная реализация обнаружения столкновений
-  // updatePositionsAndCollisions();
-
-  renderer.render(scene, camera);
-}
-
-// Функция для загрузки и добавления модели
-function loadModel() {
+function loadModel(url) {
   const loader = new GLTFLoader();
+  loader.load(url, (gltf) => {
+    const model = gltf.scene;
 
-  loader.load("assets/models/Xbot.glb", function (gltf) {
-    console.log(gltf, "gltf");
-    model = gltf.scene;
-    // Генерация случайных координат в диапазоне от -25 до 25
-    const randomX = THREE.MathUtils.randFloat(-24, 24);
-    // const randomX = 0;
-    const randomY = 0;
-    // const randomZ = 0;
-    const randomZ = THREE.MathUtils.randFloat(-24, 24);
-
-    // Задайте новые координаты появления модели
-    model.position.set(randomX, randomY, randomZ);
-
-    scene.add(model);
-
-    model.traverse(function (object) {
-      if (object.isMesh) object.castShadow = true;
-    });
-
-    skeleton = new THREE.SkeletonHelper(model);
-    skeleton.visible = true;
+    const skeleton = new THREE.SkeletonHelper(model);
+    skeleton.visible = false;
     scene.add(skeleton);
 
     const animations = gltf.animations;
-    mixer = new THREE.AnimationMixer(model);
+    const mixer = new THREE.AnimationMixer(model);
 
-    // mixers.push(mixer);
+    idleAction = mixer.clipAction(animations[2]);
+    walkAction = mixer.clipAction(animations[3]);
 
-    numAnimations = animations.length;
+    idleAction.play();
 
-    for (let i = 0; i !== numAnimations; ++i) {
-      let clip = animations[i];
-      const name = clip.name;
+    scene.add(model);
 
-      if (baseActions[name]) {
-        const action = mixer.clipAction(clip);
-        activateAction(action);
-        baseActions[name].action = action;
-        allActions.push(action);
-      }
-    }
+    model.position.set(Math.random() * 40 - 20, 0, Math.random() * 40 - 20);
+
+    const modelState = {
+      id: models.length,
+      model: model,
+      mixer: mixer,
+      idleAction: idleAction,
+      walkAction: walkAction,
+      isWalking: false,
+    };
+
+    models.push(modelState);
+    mixers.push(mixer);
   });
 }
 
-function createBoxes() {
-  const totalBoxes = 2000;
-  const boxSize = 1;
-
-  // Генерация 1000 красных и 1000 синих боксов
-  for (let i = 0; i < totalBoxes; i++) {
-    const geometry = new THREE.BoxGeometry(boxSize, boxSize, boxSize);
-    let color, position;
-    if (i < totalBoxes / 2) {
-      // Красные боксы с положительным x
-      color = 0xff0000;
-      position = new THREE.Vector3(
-        Math.random() * 25 + 3,
-        Math.floor(Math.random() * 11 + 1),
-        Math.random() * 50 - 25,
-      );
-    } else {
-      // Синие боксы с отрицательным x
-      color = 0x0000ff;
-      position = new THREE.Vector3(
-        -(Math.random() * 25 + 3),
-        Math.floor(Math.random() * 11 + 1),
-        Math.random() * 50 - 25,
-      );
-    }
-    const material = new THREE.MeshBasicMaterial({ color });
-    const box = new THREE.Mesh(geometry, material);
-
-    // Установка позиции бокса
-    box.position.copy(position);
-
-    // Создание физического тела для бокса
-    // const boxShape = new Ammo.btBoxShape(new Ammo.btVector3(boxSize / 2, boxSize / 2, boxSize / 2));
-    // const transform = new Ammo.btTransform();
-    // transform.setIdentity();
-    // transform.setOrigin(new Ammo.btVector3(position.x, position.y, position.z));
-    // const motionState = new Ammo.btDefaultMotionState(transform);
-    // const localInertia = new Ammo.btVector3(0, 0, 0);
-    // boxShape.calculateLocalInertia(1, localInertia);
-    // const rbInfo = new Ammo.btRigidBodyConstructionInfo(1, motionState, boxShape, localInertia);
-    // const boxBody = new Ammo.btRigidBody(rbInfo);
-
-    // Добавление физического тела в мир
-    // physicsWorld.addRigidBody(boxBody);
-
-    // Добавление бокса в массив в зависимости от цвета
-
-    if (i < totalBoxes / 2) {
-      boxesRed.push(box);
-    } else {
-      boxesBlue.push(box);
-    }
-    scene.add(box);
+// Function to move the model
+function updateAnimation(modelState) {
+  if (modelState.isWalking) {
+    modelState.idleAction.stop();
+    modelState.walkAction.play();
+  } else {
+    modelState.walkAction.stop();
+    modelState.idleAction.play();
   }
-
-  console.log(boxesRed, "boxesRed");
 }
 
-function updatePositionsAndCollisions() {
-  // Получаем время, прошедшее с последнего кадра
-  const delta = clock.getDelta();
+// Function to move models towards each other
+function moveModelsTowardsEachOther(delta) {
+  let numModels = models.length;
 
-  for (let i = 0; i < boxesRed.length; i++) {
-    for (let j = 0; j < boxesBlue.length; j++) {
-      const boxRed = boxesRed[i];
-      const boxBlue = boxesBlue[j];
-      // Вычисляем вектор направления от красного к синему объекту
-      const direction = boxBlue.position
-        .clone()
-        .sub(boxRed.position)
-        .normalize();
-      // Устанавливаем скорость движения
-      const speed = 0.05;
-      // Изменяем позицию красного объекта
-      boxRed.position.add(direction.clone().multiplyScalar(speed * delta));
-      // Изменяем позицию синего объекта
-      boxBlue.position.sub(direction.clone().multiplyScalar(speed * delta));
-      // Проверяем столкновение
-      if (boxRed.position.distanceTo(boxBlue.position) < 1) {
-        // Удаляем объекты из сцены
-        scene.remove(boxRed);
-        scene.remove(boxBlue);
-        // Удаляем объекты из массивов
-        boxesRed.splice(i, 1);
-        boxesBlue.splice(j, 1);
-        // Поскольку мы удалили объекты из массива, сдвигаем индексы
-        i--;
-        j--;
+  if (numModels === 1) {
+    models[0].isWalking = false;
+    updateAnimation(models[0]);
+
+    // models = [];
+    return;
+  }
+
+  for (let i = 0; i < numModels; i++) {
+    const currentModel = models[i];
+    const model = currentModel.model;
+
+    // Find the nearest model
+    let nearestModelIndex = -1;
+    let minDistance = Infinity;
+    for (let j = 0; j < numModels; j++) {
+      if (i !== j) {
+        const distance = model.position.distanceTo(models[j].model.position);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestModelIndex = j;
+        }
+      }
+    }
+
+    if (nearestModelIndex !== -1) {
+      const nearestModel = models[nearestModelIndex].model;
+
+      // Calculate distance between currentModel and nearestModel
+      const distance = model.position.distanceTo(nearestModel.position);
+
+      if (distance > 1) {
+        currentModel.isWalking = true;
+        updateAnimation(currentModel);
+        // Move the current model towards the nearest model
+        const targetPosition = model.position
+          .clone()
+          .lerp(nearestModel.position, 0.5);
+
+        const direction = new THREE.Vector3()
+          .copy(targetPosition)
+          .sub(model.position)
+          .normalize();
+
+        // Вычисляем величину перемещения на основе скорости и времени
+        const moveAmount = 1 * delta;
+
+        // Перемещаем модели по направлению к целевой позиции
+        model.position.add(direction.multiplyScalar(moveAmount));
+
+        // Look at the nearest model
+        model.lookAt(nearestModel.position);
+      }
+
+      if (distance <= 1) {
+        currentModel.isWalking = false;
+        updateAnimation(currentModel);
+        updateAnimation(models[nearestModelIndex]);
+
+        const randomIndex = Math.round(Math.random());
+
+        if (randomIndex === 0) {
+          const indexToRemove = models.findIndex(
+            (item) => item.id === currentModel.id,
+          ); // Находим индекс элемента с указанным id
+
+          if (indexToRemove !== -1) {
+            // Если элемент с указанным id найден
+            models.splice(indexToRemove, 1); // Удаляем элемент из исходного массива по индексу
+            numModels--; // Уменьшаем количество моделей в массиве
+            i--; // Корректируем счетчик цикла
+          } else {
+            console.log("Элемент с id не найден в массиве.");
+          }
+
+          scene.remove(model);
+        } else {
+          const indexToRemove = models.findIndex(
+            (item) => item.id === models[nearestModelIndex].id,
+          ); // Находим индекс элемента с указанным id
+
+          if (indexToRemove !== -1) {
+            // Если элемент с указанным id найден
+            models.splice(indexToRemove, 1); // Удаляем элемент из исходного массива по индексу
+            numModels--; // Уменьшаем количество моделей в массиве
+            i--; // Корректируем счетчик цикла
+          } else {
+            console.log("Элемент с id не найден в массиве.");
+          }
+
+          scene.remove(nearestModel);
+        }
       }
     }
   }
+
+  // for (let i = 0; i < numModels - 1; i += 2) {
+  //   const model1State = models[i];
+  //   const model2State = models[i + 1];
+  //
+  //   if (!model2State) {
+  //     console.error("Not enough models for pairing.");
+  //     break; // Break the loop if there are no more models to pair
+  //   }
+  //
+  //   const model1 = model1State.model;
+  //   const model2 = model2State.model;
+  //
+  //   const targetPosition = model1.position.clone().lerp(model2.position, 0.5);
+  //
+  //   // Calculate distance between models
+  //   const distance = model1.position.distanceTo(model2.position);
+  //
+  //   // Move models towards each other
+  //   if (distance > 1) {
+  //     const moveAmount = 0.5 * delta; // Adjust the movement amount here
+  //     model1.position.lerp(targetPosition, moveAmount);
+  //     model2.position.lerp(targetPosition, moveAmount);
+  //     model1State.isWalking = true;
+  //     model2State.isWalking = true;
+  //     updateAnimation(model1State);
+  //     updateAnimation(model2State);
+  //   }
+  //
+  //   // Look at each other
+  //   model1.lookAt(model2.position);
+  //   model2.lookAt(model1.position);
+  //
+  //   // Check if distance is less than or equal to 1
+  //   if (distance <= 1) {
+  //     // Stop the movement if distance is less than or equal to 1
+  //     model1State.isWalking = false;
+  //     model2State.isWalking = false;
+  //     updateAnimation(model1State);
+  //     updateAnimation(model2State);
+  //
+  //     // Remove either model1 or model2 randomly
+  //     const randomIndex = Math.round(Math.random());
+  //     const modelToRemove = models[randomIndex];
+  //
+  //     console.log(modelToRemove, "modelToRemove");
+  //     console.log(randomIndex, "randomIndex");
+  //
+  //
+  //     // Remove models from the scene
+  //     // scene.remove(model1);
+  //     // scene.remove(model2);
+  //
+  //     // Remove model from the scene
+  //     // scene.remove(modelToRemove);
+  //
+  //     // Remove models from the array
+  //     // models.splice(i, 1);
+  //     // i -= 1;
+  //   }
+  // }
 }
 
-// Функция для управления перемещением модели
-function moveModel() {
-  if (false) {
-    // Перемещайте объект вперед (например, вдоль оси Z)
-    model.position.z += movementSpeed;
-  }
-}
+/** Базовые обпаботчики событий длы поддержки ресайза */
+window.addEventListener("resize", () => {
+  // Обновляем размеры
+  sizes.width = window.innerWidth;
+  sizes.height = window.innerHeight;
 
-function setWeight(action, weight) {
-  action.enabled = true;
-  action.setEffectiveTimeScale(1);
-  action.setEffectiveWeight(weight);
-}
-
-function activateAction(action) {
-  const clip = action.getClip();
-
-  const settings = baseActions[clip.name];
-  setWeight(action, settings.weight);
-  action.play();
-}
-
-function createPanel() {
-  const panel = new GUI({ width: 310 });
-
-  const folder1 = panel.addFolder("Base Actions");
-
-  panelSettings = {
-    "modify time scale": 1.0,
-  };
-
-  const baseNames = ["None", ...Object.keys(baseActions)];
-
-  for (let i = 0, l = baseNames.length; i !== l; ++i) {
-    const name = baseNames[i];
-    const settings = baseActions[name];
-    panelSettings[name] = function () {
-      const currentSettings = baseActions[currentBaseAction];
-      const currentAction = currentSettings ? currentSettings.action : null;
-      const action = settings ? settings.action : null;
-
-      if (currentAction !== action) {
-        prepareCrossFade(currentAction, action, 0.35);
-      }
-    };
-
-    crossFadeControls.push(folder1.add(panelSettings, name));
-  }
-
-  folder1.open();
-
-  crossFadeControls.forEach(function (control) {
-    control.setInactive = function () {
-      control.domElement.classList.add("control-inactive");
-    };
-
-    control.setActive = function () {
-      control.domElement.classList.remove("control-inactive");
-    };
-
-    const settings = baseActions[control.property];
-
-    if (!settings || !settings.weight) {
-      control.setInactive();
-    }
-  });
-}
-
-// Проверка столкновения объекта с стенами
-function checkCollisions(object) {
-  // Проверяем столкновения с каждой стеной
-  const objects = [wall1, wall2, wall3, wall4];
-  for (const wall of objects) {
-    const collision =
-      object.position.distanceTo(wall.position) <
-      (object.geometry.parameters.width + wall.geometry.parameters.width) / 2;
-    if (collision) {
-      // Обработка столкновения
-      // Например, отмена перемещения объекта
-      object.position.copy(object.userData.previousPosition);
-      break; // Выходим из цикла, если найдено столкновение
-    }
-  }
-}
-
-function prepareCrossFade(startAction, endAction, duration) {
-  // If the current action is 'idle', execute the crossfade immediately;
-  // else wait until the current action has finished its current loop
-
-  if (currentBaseAction === "idle" || !startAction || !endAction) {
-    executeCrossFade(startAction, endAction, duration);
-  } else {
-    synchronizeCrossFade(startAction, endAction, duration);
-  }
-
-  // Update control colors
-
-  if (endAction) {
-    const clip = endAction.getClip();
-    currentBaseAction = clip.name;
-  } else {
-    currentBaseAction = "None";
-  }
-
-  crossFadeControls.forEach(function (control) {
-    const name = control.property;
-
-    if (name === currentBaseAction) {
-      control.setActive();
-    } else {
-      control.setInactive();
-    }
-  });
-}
-
-function synchronizeCrossFade(startAction, endAction, duration) {
-  mixer.addEventListener("loop", onLoopFinished);
-
-  function onLoopFinished(event) {
-    if (event.action === startAction) {
-      mixer.removeEventListener("loop", onLoopFinished);
-
-      executeCrossFade(startAction, endAction, duration);
-    }
-  }
-}
-
-function executeCrossFade(startAction, endAction, duration) {
-  // Not only the start action, but also the end action must get a weight of 1 before fading
-  // (concerning the start action this is already guaranteed in this place)
-
-  if (endAction) {
-    setWeight(endAction, 1);
-    endAction.time = 0;
-
-    if (startAction) {
-      // Crossfade with warping
-
-      startAction.crossFadeTo(endAction, duration, true);
-    } else {
-      // Fade in
-
-      endAction.fadeIn(duration);
-    }
-  } else {
-    // Fade out
-
-    startAction.fadeOut(duration);
-  }
-}
-
-function modifyTimeScale(speed) {
-  mixer.timeScale = speed;
-}
-
-// EVENT HANDLERS
-function onWindowResize() {
-  SCREEN_WIDTH = window.innerWidth;
-  SCREEN_HEIGHT = window.innerHeight;
-
-  renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-  camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+  // Обновляем соотношение сторон камеры
+  camera.aspect = sizes.width / sizes.height;
   camera.updateProjectionMatrix();
-}
 
-// EVENTS
-window.addEventListener("resize", onWindowResize);
-
-window.addEventListener("DOMContentLoaded", () => {
-  Ammo().then((AmmoLoaded) => {
-    window.Ammo = AmmoLoaded;
-    // new Game("renderCanvas");
-  });
+  // Обновляем renderer
+  renderer.setSize(sizes.width, sizes.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.render(scene, camera);
 });

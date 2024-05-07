@@ -5,7 +5,7 @@ import createPositionComponent from "../components/position";
 import createVelocityComponent from "../components/velocity";
 import createAppearanceComponent from "../components/appearance";
 
-const createCharacterEntity = (name, faction, characterAISystem) => {
+const createCharacterEntity = (name, faction) => {
   // Создание компонентов для
   const characterName = createNameComponent(name);
   const characterFaction = createFactionComponent(faction);
