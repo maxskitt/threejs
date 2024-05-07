@@ -92,7 +92,7 @@ const init = () => {
   scene.add(wallsGroup);
 
   // Создаем направленный свет
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5); // Цвет света и его интенсивность
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Цвет света и его интенсивность
   directionalLight.position.set(0, 1, 0); // Устанавливаем позицию света
   scene.add(directionalLight);
 
@@ -104,7 +104,7 @@ const init = () => {
   scene.add(directionalLightHelper);
 
   // Создаем точечный свет
-  const pointLight = new THREE.PointLight(0xffffff, 0.5); // Цвет света и его интенсивность
+  const pointLight = new THREE.PointLight(0xffffff, 1); // Цвет света и его интенсивность
   pointLight.position.set(0, 100, 0); // Устанавливаем позицию света
   scene.add(pointLight);
 

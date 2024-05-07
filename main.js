@@ -29,13 +29,13 @@ camera.position.x = 0;
 camera.position.y = 35;
 
 // // Define the number of times to load the model
-const numberOfModels = 5;
+const numberOfModels = 100;
 let modelsLoaded = 0;
 //
 
 // // Load the same model multiple times using a for loop
 for (let i = 0; i < numberOfModels; i++) {
-  loadModel("assets/models/Xbot.glb");
+  loadModel("assets/models/XbotWhite.glb");
 }
 
 const renderLoop = () => {
