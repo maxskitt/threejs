@@ -3,7 +3,6 @@ import WebGL from "three/addons/capabilities/WebGL.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import Stats from "stats.js";
 import init from "./init";
-import { log } from "three/nodes";
 
 const { sizes, camera, scene, canvas, controls, renderer, clock } = init();
 let models = [];
