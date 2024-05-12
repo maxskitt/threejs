@@ -12,9 +12,6 @@ const createXbotRedEntity = () => {
 
       if (chanceToHit < hitProbability) {
         target.health -= otherTarget.damage;
-        console.log("Attack hit Red!");
-      } else {
-        console.log("Attack missed Red!");
       }
     },
   };

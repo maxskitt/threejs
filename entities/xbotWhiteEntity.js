@@ -12,9 +12,6 @@ const createXbotWhiteEntity = () => {
 
       if (chanceToHit < hitProbability) {
         target.health -= otherTarget.damage;
-        console.log("Attack hit White!");
-      } else {
-        console.log("Attack missed White!");
       }
     },
   };

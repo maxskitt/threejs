@@ -12,26 +12,36 @@ const { sizes, camera, scene, canvas, controls, renderer, clock } = init();
 
 let animations;
 let maxArmy = 40;
-let xbotRed = 20000;
-let xbotWhite = 20000;
+let xbotmodelRedClone;
+let xbotmodelWhiteClone;
+let xbotRedCount = 20000;
+let xbotWhiteCount = 20000;
 let xbotRedEntities = [];
 let xbotWhiteEntities = [];
 
 // Загружаем модель и создаем сущность красного робота после загрузки модели
-loadModel("assets/models/XbotRed.glb", true);
-loadModel("assets/models/XbotWhite.glb");
+loadModel("assets/models/XbotRed.glb", true, 20);
+loadModel("assets/models/XbotWhite.glb", false, 20);
 
 let stats = new Stats();
 document.body.appendChild(stats.dom);
 
-camera.position.z = 60;
-camera.position.x = 0;
-camera.position.y = 300;
-
 let timeSinceLastAttack = 0;
 const attackInterval = 0.5; // Интервал атаки в секундах
 
-const animate = () => {
+if (WebGL.isWebGLAvailable()) {
+  Ammo().then(function (AmmoLib) {
+    Ammo = AmmoLib;
+
+    init();
+    animate();
+  });
+} else {
+  const warning = WebGL.getWebGLErrorMessage();
+  document.getElementById("app").appendChild(warning);
+}
+
+function animate() {
   stats.begin();
   controls.update();
   const delta = clock.getDelta();
@@ -53,64 +63,102 @@ const animate = () => {
     }
   }
 
+  addSceneEntity();
+
   for (const entity of [...xbotRedEntities, ...xbotWhiteEntities]) {
     entity.mixer.update(delta);
-  }
-
-  if (
-    maxArmy > xbotRedEntities.length + xbotWhiteEntities.length &&
-    xbotRedEntities.length === 0 &&
-    xbotWhiteEntities.length
-  ) {
-    // loadModel("assets/models/XbotRed.glb", true);
-    // console.log("1");
   }
 
   renderer.render(scene, camera);
   stats.end();
   window.requestAnimationFrame(animate);
-};
-
-if (WebGL.isWebGLAvailable()) {
-  init();
-  animate();
-} else {
-  const warning = WebGL.getWebGLErrorMessage();
-  document.getElementById("app").appendChild(warning);
 }
-function loadModel(url, isRed) {
+
+function loadModel(url, isRed, numModels) {
   const loader = new GLTFLoader();
   loader.load(url, (gltf) => {
-    const model = gltf.scene;
+    if (isRed) {
+      xbotmodelRedClone = gltf.scene;
+    } else {
+      xbotmodelWhiteClone = gltf.scene;
+    }
+
     animations = gltf.animations;
 
-    setupDefaultScene(model, isRed);
+    setupDefaultScene(isRed, numModels, true);
   });
 }
 
-function setupDefaultScene(model, isRed) {
-  const numModels = 20; // Number of models to create
-
+function setupDefaultScene(isRed, numModels, isDefault) {
   for (let i = 0; i < numModels; i++) {
-    const clonedModel = SkeletonUtils.clone(model);
+    let clonedModel;
     let component;
+
+    if (isRed) {
+      clonedModel = SkeletonUtils.clone(xbotmodelRedClone);
+    } else {
+      clonedModel = SkeletonUtils.clone(xbotmodelWhiteClone);
+    }
+
     if (isRed) {
       component = createXbotRedEntity();
     } else {
       component = createXbotWhiteEntity();
     }
 
-    if (isRed) {
-      // Position each model
-      clonedModel.position.z = i * 2 - 5;
-      clonedModel.position.x = -10;
+    if (!isDefault) {
+      // Использование рандомного значения для i в диапазоне от 0 до 10
+      let randomI = Math.floor(Math.random() * 10);
 
-      // Поворот модели на 90 градусов вокруг оси Y
+      if (isRed) {
+        clonedModel.position.z = randomI * 2 - 10;
+        clonedModel.position.x = randomI % 2 === 0 ? -20 : -18;
+      } else {
+        clonedModel.position.z = randomI * 2 - 10;
+        clonedModel.position.x = randomI % 2 === 0 ? 12 : 10;
+      }
+    }
+
+    if (isRed && isDefault) {
+      if (i >= 0 && 10 >= i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 10;
+        clonedModel.position.x = i % 2 === 0 ? -20 : -18;
+      }
+      if (i >= 10 && 20 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 30;
+        clonedModel.position.x = i % 2 === 0 ? -16 : -14;
+      }
+
+      if (i >= 20 && 30 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 50;
+        clonedModel.position.x = i % 2 === 0 ? -12 : -10;
+      }
+
+      if (i >= 30 && 40 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 70;
+        clonedModel.position.x = i % 2 === 0 ? -8 : -6;
+      }
+
       clonedModel.rotation.y = Math.PI / 2;
-    } else {
-      // Position each model
-      clonedModel.position.z = i * 2 - 5;
-      clonedModel.position.x = 10 + i;
+    } else if (isDefault) {
+      if (i >= 0 && 10 >= i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 10;
+        clonedModel.position.x = i % 2 === 0 ? 12 : 10;
+      }
+      if (i >= 10 && 20 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 30;
+        clonedModel.position.x = i % 2 === 0 ? 16 : 14;
+      }
+
+      if (i >= 20 && 30 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 50;
+        clonedModel.position.x = i % 2 === 0 ? 20 : 18;
+      }
+
+      if (i >= 30 && 40 > i && Infinity >= i) {
+        clonedModel.position.z = i * 2 - 70;
+        clonedModel.position.x = i % 2 === 0 ? 22 : 24;
+      }
 
       // Поворот модели на 90 градусов вокруг оси Y
       clonedModel.rotation.y = -Math.PI / 2;
@@ -135,6 +183,38 @@ function setupDefaultScene(model, isRed) {
     } else {
       xbotWhiteEntities.push(addEntity);
     }
+  }
+}
+
+function addSceneEntity() {
+  if (!xbotmodelRedClone || !xbotmodelWhiteClone) {
+    return;
+  }
+
+  if (xbotRedEntities.length + xbotWhiteEntities.length >= maxArmy) {
+    return;
+  }
+
+  if (xbotRedEntities.length === 0 && xbotWhiteEntities.length > 0) {
+    return;
+  }
+
+  if (xbotRedEntities.length > 0 && xbotWhiteEntities.length === 0) {
+    return;
+  }
+
+  const isRed = Math.random() < 0.5; // Шанс получить true или false - 50/50
+
+  if (xbotRedCount > 0 && isRed && xbotWhiteEntities.length >= 10) {
+    xbotRedCount -= 1;
+    console.log(xbotRedCount, "xbotRedCount");
+    setupDefaultScene(isRed, 1, false); // Вызов функции с аргументами
+  }
+
+  if (xbotWhiteCount > 0 && !isRed && xbotRedEntities.length >= 10) {
+    xbotWhiteCount -= 1;
+    console.log(xbotWhiteCount, "xbotWhiteCount");
+    setupDefaultScene(isRed, 1, false); // Вызов функции с аргументами
   }
 }
 

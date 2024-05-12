@@ -12,8 +12,13 @@ function armySystem(
   if (redEntities.length === 0 && whiteEntities.length > 0) {
     // Проиграть анимацию для оставшихся белых объектов
     whiteEntities.forEach((whiteEntity) => {
-      whiteEntity.mixer.clipAction(animations[3]).stop();
-      whiteEntity.mixer.clipAction(animations[2]).play();
+      const currentAction = whiteEntity.mixer.clipAction(animations[2]); // Получаем экземпляр анимации
+      const currentActionIsPlaying = currentAction.isRunning(); // Проверяем, играет ли уже эта анимация
+
+      if (!currentActionIsPlaying) {
+        whiteEntity.mixer.clipAction(animations[3]).stop();
+        whiteEntity.mixer.clipAction(animations[2]).play();
+      }
     });
 
     return;
@@ -23,8 +28,13 @@ function armySystem(
   if (redEntities.length > 0 && whiteEntities.length === 0) {
     // Проиграть анимацию для оставшихся красных объектов
     redEntities.forEach((redEntity) => {
-      redEntity.mixer.clipAction(animations[3]).stop();
-      redEntity.mixer.clipAction(animations[2]).play();
+      const currentAction = redEntity.mixer.clipAction(animations[2]); // Получаем экземпляр анимации
+      const currentActionIsPlaying = currentAction.isRunning(); // Проверяем, играет ли уже эта анимация
+
+      if (!currentActionIsPlaying) {
+        redEntity.mixer.clipAction(animations[3]).stop();
+        redEntity.mixer.clipAction(animations[2]).play();
+      }
     });
 
     return;
@@ -37,9 +47,13 @@ function armySystem(
 
     // Если есть красный объект для обработки
     if (redEntity) {
+
       const closestWhiteEntity = findEntity(redEntity.object, whiteEntities);
 
       if (closestWhiteEntity !== -1) {
+        const currentAction = redEntity.mixer.clipAction(animations[3]); // Получаем экземпляр анимации
+        const currentActionIsPlaying = currentAction.isRunning(); // Проверяем, играет ли уже эта анимация
+
         const getWhiteEntity = whiteEntities[closestWhiteEntity];
         // Calculate distance between currentModel and nearestModel
         const distance = redEntity.object.position.distanceTo(
@@ -47,9 +61,11 @@ function armySystem(
         );
 
         if (distance > 1) {
-          // Play the same animation for each model
-          redEntity.mixer.clipAction(animations[2]).stop();
-          redEntity.mixer.clipAction(animations[3]).play();
+          if (!currentActionIsPlaying) {
+            // Play the same animation for each model
+            redEntity.mixer.clipAction(animations[2]).stop();
+            redEntity.mixer.clipAction(animations[3]).play();
+          }
 
           moveTowards(
             redEntity.object,
@@ -60,9 +76,12 @@ function armySystem(
         }
 
         if (distance <= 1 && getWhiteEntity.component.health > 0) {
-          // Play the same animation for each model
-          redEntity.mixer.clipAction(animations[3]).stop();
-          redEntity.mixer.clipAction(animations[2]).play();
+
+          if (currentActionIsPlaying) {
+            // Play the same animation for each model
+            redEntity.mixer.clipAction(animations[3]).stop();
+            redEntity.mixer.clipAction(animations[2]).play();
+          }
 
           if (intervalAttack) {
             getWhiteEntity.component.attack(
@@ -72,8 +91,10 @@ function armySystem(
           }
         } else if (getWhiteEntity.component.health <= 0) {
           // Play the same animation for each model
-          redEntity.mixer.clipAction(animations[3]).stop();
-          redEntity.mixer.clipAction(animations[2]).play();
+          if (!currentActionIsPlaying) {
+            redEntity.mixer.clipAction(animations[3]).stop();
+            redEntity.mixer.clipAction(animations[2]).play();
+          }
 
           // Remove redEntity if health is <= 0
           whiteEntities.splice(closestWhiteEntity, 1); // Remove from array
@@ -87,6 +108,9 @@ function armySystem(
       const closestRedEntity = findEntity(whiteEntity.object, redEntities);
 
       if (closestRedEntity !== -1) {
+        const currentAction = whiteEntity.mixer.clipAction(animations[3]); // Получаем экземпляр анимации
+        const currentActionIsPlaying = currentAction.isRunning(); // Проверяем, играет ли уже эта анимация
+
         const getRedEntity = redEntities[closestRedEntity];
         // Calculate distance between currentModel and nearestModel
         const distance = whiteEntity.object.position.distanceTo(
@@ -94,9 +118,11 @@ function armySystem(
         );
 
         if (distance > 1) {
-          // Play the same animation for each model
-          whiteEntity.mixer.clipAction(animations[2]).stop();
-          whiteEntity.mixer.clipAction(animations[3]).play();
+          if (!currentActionIsPlaying) {
+            // Play the same animation for each model
+            whiteEntity.mixer.clipAction(animations[2]).stop();
+            whiteEntity.mixer.clipAction(animations[3]).play();
+          }
 
           moveTowards(
             whiteEntity.object,
@@ -107,9 +133,12 @@ function armySystem(
         }
 
         if (distance <= 1 && getRedEntity.component.health > 0) {
-          // Play the same animation for each model
-          whiteEntity.mixer.clipAction(animations[3]).stop();
-          whiteEntity.mixer.clipAction(animations[2]).play();
+
+          if (currentActionIsPlaying) {
+            // Play the same animation for each model
+            whiteEntity.mixer.clipAction(animations[3]).stop();
+            whiteEntity.mixer.clipAction(animations[2]).play();
+          }
 
           if (intervalAttack) {
             getRedEntity.component.attack(
@@ -118,9 +147,11 @@ function armySystem(
             );
           }
         } else if (getRedEntity.component.health <= 0) {
-          // Play the same animation for each model
-          whiteEntity.mixer.clipAction(animations[3]).stop();
-          whiteEntity.mixer.clipAction(animations[2]).play();
+          if (currentActionIsPlaying) {
+            // Play the same animation for each model
+            whiteEntity.mixer.clipAction(animations[3]).stop();
+            whiteEntity.mixer.clipAction(animations[2]).play();
+          }
 
           // Remove redEntity if health is <= 0
           redEntities.splice(closestRedEntity, 1); // Remove from array

@@ -6,3 +6,4 @@ const createXbotWhiteComponent = {
 };
 
 export default createXbotWhiteComponent;
+
