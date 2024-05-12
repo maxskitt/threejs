@@ -1,8 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-let physics
 const init = () => {
-
   const sizes = {
     width: window.innerWidth,
     height: window.innerHeight,
@@ -16,7 +14,6 @@ const init = () => {
 
   camera.position.x = 30;
   camera.position.y = 25;
-
 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
