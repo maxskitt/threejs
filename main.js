@@ -10,7 +10,6 @@ import armySystem from "./systems/armySystem";
 
 const { sizes, camera, scene, canvas, controls, renderer, clock } = init();
 
-// Загружаем модель и создаем сущность красного робота после загрузки модели
 loadModel("assets/models/XbotRed.glb", true, 20);
 loadModel("assets/models/XbotWhite.glb", false, 20);
 
@@ -31,6 +30,7 @@ let timeSinceLastAttack = 0;
 const attackInterval = 0.5;
 
 if (WebGL.isWebGLAvailable()) {
+  init();
   animate();
 } else {
   const warning = WebGL.getWebGLErrorMessage();
