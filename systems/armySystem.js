@@ -23,7 +23,6 @@ function armySystem(
   }
 
   if (redEntities.length > 0 && whiteEntities.length === 0) {
-
     redEntities.forEach((redEntity) => {
       const currentAction = redEntity.mixer.clipAction(animations[2]);
       const currentActionIsPlaying = currentAction.isRunning();
@@ -37,11 +36,9 @@ function armySystem(
     return;
   }
 
-
   for (let i = 0; i < Math.max(redEntities.length, whiteEntities.length); i++) {
     const redEntity = redEntities[i];
     const whiteEntity = whiteEntities[i];
-
 
     if (redEntity) {
       const closestWhiteEntity = findEntity(redEntity.object, whiteEntities);
@@ -66,6 +63,7 @@ function armySystem(
             getWhiteEntity.object,
             redEntity.component.speed,
             delta,
+            redEntities,
           );
         }
 
@@ -117,6 +115,7 @@ function armySystem(
             getRedEntity.object,
             whiteEntity.component.speed,
             delta,
+            whiteEntities,
           );
         }
 
@@ -161,7 +160,7 @@ function findEntity(entity, entities) {
   return closestIndex;
 }
 
-function moveTowards(entity, targetEntity, movementSpeed, delta) {
+function moveTowards(entity, targetEntity, movementSpeed, delta, entries) {
   if (movementSpeed === 0) return;
 
   const direction = new THREE.Vector3()
@@ -170,10 +169,44 @@ function moveTowards(entity, targetEntity, movementSpeed, delta) {
     .normalize();
 
   const moveAmount = movementSpeed * delta;
+  const entityDistanceToTarget = entity.position.distanceTo(targetEntity.position);
+
+  // Проверка столкновений с объектами в массиве entries
+  for (let i = 0; i < entries.length; i++) {
+    const otherEntity = entries[i].object;
+    if (
+      otherEntity !== entity &&
+      entity.position.distanceTo(otherEntity.position) < 1
+    ) {
+      const otherEntityDistanceToTarget = otherEntity.position.distanceTo(
+        targetEntity.position,
+      );
+      if (otherEntityDistanceToTarget < entityDistanceToTarget) {
+        // Остановить текущий entity, так как он дальше от targetEntity
+        return;
+      }
+    }
+  }
 
   entity.position.add(direction.multiplyScalar(moveAmount));
 
   entity.lookAt(targetEntity.position);
+}
+
+function checkCollisions(entity, entities) {
+  // Проверяем столкновения объекта с другими объектами на сцене
+  const collisions = [];
+  for (let i = 0; i < entities.length; i++) {
+    const otherObject = entities[i].object;
+    if (
+      entity !== otherObject &&
+      entity.position.distanceTo(otherObject.position) < 1
+    ) {
+      // Если объекты находятся на расстоянии менее 1 единиц, считаем это столкновением
+      collisions.push(otherObject);
+    }
+  }
+  return collisions;
 }
 
 export default armySystem;

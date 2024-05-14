@@ -6,6 +6,9 @@ const init = () => {
     height: window.innerHeight,
   };
 
+  // Массив для хранения квадратов
+  const squares = [];
+
   const clock = new THREE.Clock();
   const scene = new THREE.Scene();
   const canvas = document.querySelector(".canvas");
@@ -38,7 +41,26 @@ const init = () => {
 
   scene.add(ambientLight);
 
-  return { sizes, scene, canvas, camera, renderer, controls, clock };
+  // Создание геометрии квадрата
+  const geometry = new THREE.BoxGeometry(1, 1); // Плоскость 1x1
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    side: THREE.DoubleSide,
+  }); // Материал
+  const square = new THREE.Mesh(geometry, material); // Меш
+
+  // Сместить квадрат по оси X на 2 единицы
+  square.position.x = 0.2;
+
+  // Добавление 50000 квадратов
+  for (let i = 0; i < 100000; i++) {
+    const square = new THREE.Mesh(geometry, material);
+    square.position.x = i * 1.2; // Смещение по оси X на 0.2 для каждого квадрата
+    squares.push(square);
+    scene.add(square);
+  }
+
+  return { sizes, scene, canvas, camera, renderer, controls, clock, squares };
 };
 
 export default init;
