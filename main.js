@@ -7,23 +7,12 @@ import init from "./init";
 import createXbotRedEntity from "./entities/xbotRedEntity";
 import createXbotWhiteEntity from "./entities/xbotWhiteEntity";
 import armySystem from "./systems/armySystem";
-import { updatePhysics } from "./physics/physicsUtils";
 
-const { sizes, camera, scene, canvas, controls, renderer, clock } = init();
+const { sizes, camera, scene, canvas, controls, renderer, clock, squares } =
+  init();
 
-// Physics variables
-const gravityConstant = -9.8;
-let collisionConfiguration;
-let dispatcher;
-let broadphase;
-let solver;
-let softBodySolver;
-let physicsWorld;
-const rigidBodies = [];
-const margin = 0.05;
-let hinge;
-let rope;
-let transformAux1;
+// loadModel("assets/models/XbotRed.glb", true, 20);
+// loadModel("assets/models/XbotWhite.glb", false, 20);
 
 // army variables
 let animations;
@@ -35,55 +24,23 @@ let xbotWhiteCount = 20000;
 let xbotRedEntities = [];
 let xbotWhiteEntities = [];
 
-
-
 let stats = new Stats();
 document.body.appendChild(stats.dom);
 
 let timeSinceLastAttack = 0;
-const attackInterval = 0.5; // Интервал атаки в секундах
+const attackInterval = 0.5;
 
 if (WebGL.isWebGLAvailable()) {
-  Ammo().then(function (AmmoLib) {
-    Ammo = AmmoLib;
-    // Загружаем модель и создаем сущность красного робота после загрузки модели
-    loadModel("assets/models/XbotRed.glb", true, 20);
-    loadModel("assets/models/XbotWhite.glb", false, 20);
-
-    initPhysics();
-    animate();
-  });
+  animate();
 } else {
   const warning = WebGL.getWebGLErrorMessage();
   document.getElementById("app").appendChild(warning);
 }
 
-function initPhysics() {
-  // Physics configuration
-
-  collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration();
-  dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration);
-  broadphase = new Ammo.btDbvtBroadphase();
-  solver = new Ammo.btSequentialImpulseConstraintSolver();
-  softBodySolver = new Ammo.btDefaultSoftBodySolver();
-  physicsWorld = new Ammo.btSoftRigidDynamicsWorld(
-    dispatcher,
-    broadphase,
-    solver,
-    collisionConfiguration,
-    softBodySolver,
-  );
-  physicsWorld.setGravity(new Ammo.btVector3(0, gravityConstant, 0));
-  physicsWorld
-    .getWorldInfo()
-    .set_m_gravity(new Ammo.btVector3(0, gravityConstant, 0));
-
-  transformAux1 = new Ammo.btTransform();
-}
-
 function animate() {
   stats.begin();
   render();
+
   stats.end();
   window.requestAnimationFrame(animate);
 }
@@ -91,30 +48,34 @@ function animate() {
 function render() {
   const deltaTime = clock.getDelta();
 
-  if (animations) {
-    timeSinceLastAttack += deltaTime;
-    const intervalAttack = timeSinceLastAttack >= attackInterval;
+  // Обновление позиций квадратов
+  squares.forEach((square) => {
+    square.position.x -= 0.01 * deltaTime; // Движение вперед по оси Z
+  });
 
-    armySystem(
-      xbotRedEntities,
-      xbotWhiteEntities,
-      deltaTime,
-      animations,
-      scene,
-      intervalAttack,
-    );
-    if (intervalAttack) {
-      timeSinceLastAttack = 0;
-    }
-  }
-
-  addSceneEntity();
-
-  for (const entity of [...xbotRedEntities, ...xbotWhiteEntities]) {
-    entity.mixer.update(deltaTime);
-  }
-
-  updatePhysics(deltaTime, physicsWorld, rigidBodies, transformAux1);
+  // if (animations) {
+  //   timeSinceLastAttack += deltaTime;
+  //   const intervalAttack = timeSinceLastAttack >= attackInterval;
+  //
+  //   armySystem(
+  //     xbotRedEntities,
+  //     xbotWhiteEntities,
+  //     deltaTime,
+  //     animations,
+  //     scene,
+  //     intervalAttack,
+  //   );
+  //
+  //   if (intervalAttack) {
+  //     addSceneEntity();
+  //
+  //     timeSinceLastAttack = 0;
+  //   }
+  // }
+  //
+  // for (const entity of [...xbotRedEntities, ...xbotWhiteEntities]) {
+  //   entity.mixer.update(deltaTime);
+  // }
 
   renderer.render(scene, camera);
 }
@@ -152,7 +113,6 @@ function setupDefaultScene(isRed, numModels, isDefault) {
     }
 
     if (!isDefault) {
-      // Использование рандомного значения для i в диапазоне от 0 до 10
       let randomI = Math.floor(Math.random() * 10);
 
       if (isRed) {
@@ -204,24 +164,12 @@ function setupDefaultScene(isRed, numModels, isDefault) {
         clonedModel.position.z = i * 2 - 70;
         clonedModel.position.x = i % 2 === 0 ? 22 : 24;
       }
-
-      // Поворот модели на 90 градусов вокруг оси Y
       clonedModel.rotation.y = -Math.PI / 2;
     }
-    // clonedModel.position.y = 10;
 
-    // Create mixer for each model
     const mixer = new THREE.AnimationMixer(clonedModel);
 
-    // Play the same animation for each model
-    mixer.clipAction(animations[2]).play(); // idle
-
-    // Создаем физическое тело для модели
-    const rigidBody = createRigidBodyForModel(clonedModel); // Функция createRigidBodyForModel нужно реализовать
-
-    // Add the cloned model and mixer to the scene
-    scene.add(clonedModel);
-    physicsWorld.addRigidBody(rigidBody);
+    mixer.clipAction(animations[2]).play();
 
     const addEntity = {
       object: clonedModel,
@@ -234,48 +182,9 @@ function setupDefaultScene(isRed, numModels, isDefault) {
     } else {
       xbotWhiteEntities.push(addEntity);
     }
+
+    scene.add(clonedModel);
   }
-}
-
-// Функция создания физического тела для модели
-function createRigidBodyForModel(model) {
-  // Получаем ограничивающий объем (bounding box) модели
-  const boundingBox = new THREE.Box3().setFromObject(model);
-  const size = new THREE.Vector3();
-  boundingBox.getSize(size);
-
-  // Определяем размеры капсулы
-  const radius = Math.max(size.x, size.z) * 0.5; // Радиус капсулы, выбираем максимальную сторону модели
-  const height = size.y; // Высота капсулы равна высоте ограничивающего объема модели
-
-  // Создаем форму для физического тела
-  const shape = new Ammo.btCapsuleShape(radius, height);
-
-  // Определяем положение капсулы в центре ограничивающего объема модели
-  const center = new THREE.Vector3();
-  boundingBox.getCenter(center);
-  const centerPos = new Ammo.btVector3(center.x, center.y, center.z);
-
-  // Создаем трансформацию для физического тела
-  const transform = new Ammo.btTransform();
-  transform.setIdentity();
-  transform.setOrigin(centerPos);
-
-  // Создаем физическое тело с массой и формой
-  const mass = 1; // Примерная масса
-  const localInertia = new Ammo.btVector3(0, 0, 0);
-  shape.calculateLocalInertia(mass, localInertia);
-  const motionState = new Ammo.btDefaultMotionState(transform);
-  const rbInfo = new Ammo.btRigidBodyConstructionInfo(
-    mass,
-    motionState,
-    shape,
-    localInertia,
-  );
-  const rigidBody = new Ammo.btRigidBody(rbInfo);
-
-  // Возвращаем созданное физическое тело
-  return rigidBody;
 }
 
 function addSceneEntity() {
@@ -295,32 +204,26 @@ function addSceneEntity() {
     return;
   }
 
-  const isRed = Math.random() < 0.5; // Шанс получить true или false - 50/50
+  const isRed = Math.random() < 0.5;
 
   if (xbotRedCount > 0 && isRed && xbotWhiteEntities.length >= 10) {
     xbotRedCount -= 1;
-    console.log(xbotRedCount, "xbotRedCount");
-    setupDefaultScene(isRed, 1, false); // Вызов функции с аргументами
+    setupDefaultScene(isRed, 1, false);
   }
 
   if (xbotWhiteCount > 0 && !isRed && xbotRedEntities.length >= 10) {
     xbotWhiteCount -= 1;
-    console.log(xbotWhiteCount, "xbotWhiteCount");
-    setupDefaultScene(isRed, 1, false); // Вызов функции с аргументами
+    setupDefaultScene(isRed, 1, false);
   }
 }
 
-/** Базовые обпаботчики событий длы поддержки ресайза */
 window.addEventListener("resize", () => {
-  // Обновляем размеры
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
 
-  // Обновляем соотношение сторон камеры
   camera.aspect = sizes.width / sizes.height;
   camera.updateProjectionMatrix();
 
-  // Обновляем renderer
   renderer.setSize(sizes.width, sizes.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.render(scene, camera);
