@@ -1,37 +1,35 @@
-import { System } from "./System.js";
-import * as THREE from "three";
+// И в вашей системе вы можете использовать компонент перемещения для обработки движения
+import { System } from "ecsy";
+import { Movement, Object3D, Target } from "../components/components.mjs";
 
 export class MovementSystem extends System {
-  constructor(entities) {
-    super(entities);
-  }
+  execute(delta, time) {
+    let entities = this.queries.entities.results;
+    entities.forEach((entity) => {
+      const movement = entity.getComponent(Movement);
+      const object3D = entity.getComponent(Object3D);
+      const target = entity.getComponent(Target);
 
-  update(delta) {
-    this.entities.forEach((entity) => {
-      const transformComponent = entity.getComponent("TransformComponent");
-      const velocityComponent = entity.getComponent("VelocityComponent");
-      const closestEnemyComponent = entity.getComponent(
-        "ClosestEnemyComponent",
-      );
+      if (target && target.entityId !== null && !movement.isStopped) {
+        // Если цель есть, двигаем объект к цели
+        const targetPosition = target.position; // Предполагается, что у компонента Target есть поле position, где хранятся координаты цели
+        const currentPosition = object3D.object.position;
 
-      // Проверяем наличие всех необходимых компонентов
-      if (
-        transformComponent &&
-        velocityComponent &&
-        closestEnemyComponent &&
-        closestEnemyComponent.closestEnemy
-      ) {
-        const enemyTransform =
-          closestEnemyComponent.closestEnemy.getComponent("TransformComponent");
-        const direction = new THREE.Vector3()
-          .subVectors(enemyTransform.position, transformComponent.position)
+        // Рассчитываем вектор направления к цели
+        const direction = targetPosition
+          .clone()
+          .sub(currentPosition)
           .normalize();
-        velocityComponent.velocity.copy(direction).multiplyScalar(0.1); // Скорость движения к цели
-        transformComponent.position.addScaledVector(
-          velocityComponent.velocity,
-          delta,
+
+        // Перемещаем объект в направлении цели
+        object3D.object.position.add(
+          direction.multiplyScalar(movement.speed * delta),
         );
       }
     });
   }
 }
+
+MovementSystem.queries = {
+  entities: { components: [Movement, Object3D, Target] }, // Система работает с сущностями, имеющими компонент перемещения и компонент Object3D
+};

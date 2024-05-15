@@ -1,20 +1,47 @@
 import * as THREE from "three";
+import { World } from "ecsy";
 import Stats from "stats.js";
-import { Entity } from "./entities/Entity.js";
-import { TransformComponent } from "./components/TransformComponent.js";
-import { MeshComponent } from "./components/MeshComponent.js";
-import { SystemManager } from "./systems/SystemManager";
-import { createSystems } from "./systems/SystemFactory";
-import { HPComponent } from "./components/HPComponent";
-import { DamageComponent } from "./components/DamageComponent";
-import { IDComponent } from "./components/IDComponent";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { ArmyComponent } from "./components/ArmyComponent";
-import { ClosestEnemyComponent } from "./components/ClosestEnemyComponent";
+import {
+  TargetSystem,
+  MovementSystem,
+  CollisionSystem,
+} from "./systems/systems.mjs";
+import {
+  ArmyId,
+  Movement,
+  Object3D,
+  Target,
+  UI,
+  Collision,
+} from "./components/components.mjs";
+
+// For debugging
+import * as Components from "./components/components.mjs";
+window.Components = Components;
+import * as Systems from "./systems/systems.mjs";
+
+window.Systems = Systems;
+window.THREE = THREE;
+
+let world = new World();
+
+world
+  .registerComponent(Object3D)
+  .registerComponent(Target)
+  .registerComponent(UI)
+  .registerComponent(Movement)
+  .registerComponent(Collision)
+  .registerComponent(ArmyId);
+
+world
+  .registerSystem(TargetSystem)
+  .registerSystem(MovementSystem)
+  .registerSystem(CollisionSystem);
 
 let scene, camera, renderer, stats, clock, controls;
-const entities = [];
-const systemManager = new SystemManager();
+
+init();
 
 function init() {
   const container = document.querySelector(".container");
@@ -31,7 +58,84 @@ function init() {
     0.1,
     1000,
   );
-  camera.position.z = 5;
+  // Устанавливаем положение камеры
+  camera.position.set(0, 0, 5);
+
+  // Направляем камеру на центр сцены
+  camera.lookAt(0, 0, 0);
+
+  // Создаем зеленый куб
+  const geometryGreen = new THREE.BoxGeometry();
+  const materialGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+  for (let i = 0; i < 10; i++) {
+    const cubeGreen = new THREE.Mesh(geometryGreen, materialGreen);
+    cubeGreen.position.set(
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+    ); // Случайные координаты
+
+    // Создаем сущность для зеленого куба
+    const cubeEntity = world.createEntity();
+    cubeEntity.addComponent(Object3D, { object: cubeGreen });
+    cubeEntity.addComponent(ArmyId, { armyID: "green" });
+    cubeEntity.addComponent(UI);
+    cubeEntity.addComponent(Movement);
+    cubeEntity.addComponent(Collision);
+    cubeEntity.addComponent(Target, { entityId: i });
+
+    scene.add(cubeGreen);
+  }
+
+  // Создаем красный куб
+  const geometryRed = new THREE.BoxGeometry();
+  const materialRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+  for (let i = 0; i < 10; i++) {
+    const cubeRed = new THREE.Mesh(geometryRed, materialRed);
+    cubeRed.position.set(
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+    ); // Случайные координаты
+
+    // Создаем сущность для красного куба
+    const cubeEntityRed = world.createEntity();
+    cubeEntityRed.addComponent(Object3D, { object: cubeRed });
+    cubeEntityRed.addComponent(ArmyId, { armyID: "red" });
+    cubeEntityRed.addComponent(UI);
+    cubeEntityRed.addComponent(Movement);
+    cubeEntityRed.addComponent(Collision);
+    cubeEntityRed.addComponent(Target, { entityId: i + 10 });
+
+    scene.add(cubeRed);
+  }
+
+  // const geometry = new THREE.BoxGeometry();
+  // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Укажите свой материал
+  // const count = 50; // Укажите количество экземпляров
+  // const mesh = new THREE.InstancedMesh(geometry, material, count);
+
+  // Создаем массив матриц трансформации
+  // const offsets = [];
+  // for (let i = 0; i < count; i++) {
+  //   const matrix = new THREE.Matrix4();
+  // Добавляем смещение для каждого экземпляра
+  // matrix.makeTranslation(i * 2, 0, 0); // Пример: смещение на i * 2 по оси X
+  // offsets.push(matrix);
+  // }
+
+  // Устанавливаем матрицы трансформации для экземпляров
+  //   for (let i = 0; i < count; i++) {
+  //     mesh.setMatrixAt(i, offsets[i]);
+  //   }
+  //
+  //   scene.add(mesh); // Добавьте InstancedMesh к сцене
+
+  // const instancedMeshEntity = world.createEntity();
+  // instancedMeshEntity.addComponent(Object3D, { object: mesh });
+  // instancedMeshEntity.addComponent(Rotating, { rotatingSpeed: 0.01 });
 
   // Создание рендерера
   renderer = new THREE.WebGLRenderer();
@@ -45,44 +149,22 @@ function init() {
   stats = new Stats();
   container.appendChild(stats.dom);
 
-  // Создание нескольких кубов
-  const cubeCount = 3;
-  const distanceBetweenCubes = 10; // Расстояние между кубами по оси X
-
-  for (let i = 0; i < cubeCount; i++) {
-    const cubeEntity = new Entity();
-    cubeEntity.addComponent(new IDComponent(i)); // Добавление компонента ID
-    cubeEntity.addComponent(new ArmyComponent(i)); // Добавление компонента Army с идентификатором 1 (например)
-    const transformComponent = new TransformComponent();
-    transformComponent.position.x = i * distanceBetweenCubes; // Расстояние между кубами по оси X
-    cubeEntity.addComponent(transformComponent);
-    cubeEntity.addComponent(
-      new MeshComponent(
-        new THREE.BoxGeometry(),
-        new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
-      ),
-    );
-    cubeEntity.addComponent(new HPComponent(100)); // Добавление компонента HP с 100 очками здоровья
-    cubeEntity.addComponent(new DamageComponent(1)); // Добавление компонента Damage с 1 очком урона
-    cubeEntity.addComponent(new ClosestEnemyComponent());
-
-    scene.add(cubeEntity.getComponent("MeshComponent").mesh); // Добавление меша в сцену
-    entities.push(cubeEntity);
-  }
-
   // Обработка изменения размера окна
   window.addEventListener("resize", onWindowResize, false);
-
-  // Создание и регистрация систем через фабрику систем
-  createSystems(systemManager, entities, renderer, scene, camera, clock);
 
   // Анимация
   function animate() {
     requestAnimationFrame(animate);
 
-    systemManager.update();
+    const delta = clock.getDelta();
+    const elapsedTime = clock.elapsedTime;
+
+    // console.time("render");
+    world.execute(delta, elapsedTime);
+    // console.timeEnd("render");
 
     stats.update();
+    renderer.render(scene, camera);
   }
 
   animate();
@@ -95,5 +177,3 @@ function onWindowResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.render(scene, camera);
 }
-
-init();
