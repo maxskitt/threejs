@@ -1,230 +1,179 @@
 import * as THREE from "three";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-import WebGL from "three/addons/capabilities/WebGL.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { World } from "ecsy";
 import Stats from "stats.js";
-import init from "./init";
-import createXbotRedEntity from "./entities/xbotRedEntity";
-import createXbotWhiteEntity from "./entities/xbotWhiteEntity";
-import armySystem from "./systems/armySystem";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import {
+  TargetSystem,
+  MovementSystem,
+  CollisionSystem,
+} from "./systems/systems.mjs";
+import {
+  ArmyId,
+  Movement,
+  Object3D,
+  Target,
+  UI,
+  Collision,
+} from "./components/components.mjs";
 
-const { sizes, camera, scene, canvas, controls, renderer, clock, squares } =
-  init();
+// For debugging
+import * as Components from "./components/components.mjs";
+window.Components = Components;
+import * as Systems from "./systems/systems.mjs";
 
-// loadModel("assets/models/XbotRed.glb", true, 20);
-// loadModel("assets/models/XbotWhite.glb", false, 20);
+window.Systems = Systems;
+window.THREE = THREE;
 
-// army variables
-let animations;
-let maxArmy = 40;
-let xbotmodelRedClone;
-let xbotmodelWhiteClone;
-let xbotRedCount = 20000;
-let xbotWhiteCount = 20000;
-let xbotRedEntities = [];
-let xbotWhiteEntities = [];
+let world = new World();
 
-let stats = new Stats();
-document.body.appendChild(stats.dom);
+world
+  .registerComponent(Object3D)
+  .registerComponent(Target)
+  .registerComponent(UI)
+  .registerComponent(Movement)
+  .registerComponent(Collision)
+  .registerComponent(ArmyId);
 
-let timeSinceLastAttack = 0;
-const attackInterval = 0.5;
+world
+  .registerSystem(TargetSystem)
+  .registerSystem(MovementSystem)
+  .registerSystem(CollisionSystem);
 
-if (WebGL.isWebGLAvailable()) {
-  animate();
-} else {
-  const warning = WebGL.getWebGLErrorMessage();
-  document.getElementById("app").appendChild(warning);
-}
+let scene, camera, renderer, stats, clock, controls;
 
-function animate() {
-  stats.begin();
-  render();
+init();
 
-  stats.end();
-  window.requestAnimationFrame(animate);
-}
+function init() {
+  const container = document.querySelector(".container");
 
-function render() {
-  const deltaTime = clock.getDelta();
+  // Создание сцены
+  scene = new THREE.Scene();
 
-  // Обновление позиций квадратов
-  squares.forEach((square) => {
-    square.position.x -= 0.01 * deltaTime; // Движение вперед по оси Z
-  });
+  clock = new THREE.Clock();
 
-  // if (animations) {
-  //   timeSinceLastAttack += deltaTime;
-  //   const intervalAttack = timeSinceLastAttack >= attackInterval;
-  //
-  //   armySystem(
-  //     xbotRedEntities,
-  //     xbotWhiteEntities,
-  //     deltaTime,
-  //     animations,
-  //     scene,
-  //     intervalAttack,
-  //   );
-  //
-  //   if (intervalAttack) {
-  //     addSceneEntity();
-  //
-  //     timeSinceLastAttack = 0;
+  // Создание камеры
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000,
+  );
+  // Устанавливаем положение камеры
+  camera.position.set(0, 0, 5);
+
+  // Направляем камеру на центр сцены
+  camera.lookAt(0, 0, 0);
+
+  // Создаем зеленый куб
+  const geometryGreen = new THREE.BoxGeometry();
+  const materialGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+  for (let i = 0; i < 10; i++) {
+    const cubeGreen = new THREE.Mesh(geometryGreen, materialGreen);
+    cubeGreen.position.set(
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+    ); // Случайные координаты
+
+    // Создаем сущность для зеленого куба
+    const cubeEntity = world.createEntity();
+    cubeEntity.addComponent(Object3D, { object: cubeGreen });
+    cubeEntity.addComponent(ArmyId, { armyID: "green" });
+    cubeEntity.addComponent(UI);
+    cubeEntity.addComponent(Movement);
+    cubeEntity.addComponent(Collision);
+    cubeEntity.addComponent(Target, { entityId: i });
+
+    scene.add(cubeGreen);
+  }
+
+  // Создаем красный куб
+  const geometryRed = new THREE.BoxGeometry();
+  const materialRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+  for (let i = 0; i < 10; i++) {
+    const cubeRed = new THREE.Mesh(geometryRed, materialRed);
+    cubeRed.position.set(
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+      Math.random() * 200 - 100,
+    ); // Случайные координаты
+
+    // Создаем сущность для красного куба
+    const cubeEntityRed = world.createEntity();
+    cubeEntityRed.addComponent(Object3D, { object: cubeRed });
+    cubeEntityRed.addComponent(ArmyId, { armyID: "red" });
+    cubeEntityRed.addComponent(UI);
+    cubeEntityRed.addComponent(Movement);
+    cubeEntityRed.addComponent(Collision);
+    cubeEntityRed.addComponent(Target, { entityId: i + 10 });
+
+    scene.add(cubeRed);
+  }
+
+  // const geometry = new THREE.BoxGeometry();
+  // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Укажите свой материал
+  // const count = 50; // Укажите количество экземпляров
+  // const mesh = new THREE.InstancedMesh(geometry, material, count);
+
+  // Создаем массив матриц трансформации
+  // const offsets = [];
+  // for (let i = 0; i < count; i++) {
+  //   const matrix = new THREE.Matrix4();
+  // Добавляем смещение для каждого экземпляра
+  // matrix.makeTranslation(i * 2, 0, 0); // Пример: смещение на i * 2 по оси X
+  // offsets.push(matrix);
+  // }
+
+  // Устанавливаем матрицы трансформации для экземпляров
+  //   for (let i = 0; i < count; i++) {
+  //     mesh.setMatrixAt(i, offsets[i]);
   //   }
-  // }
   //
-  // for (const entity of [...xbotRedEntities, ...xbotWhiteEntities]) {
-  //   entity.mixer.update(deltaTime);
-  // }
+  //   scene.add(mesh); // Добавьте InstancedMesh к сцене
 
-  renderer.render(scene, camera);
+  // const instancedMeshEntity = world.createEntity();
+  // instancedMeshEntity.addComponent(Object3D, { object: mesh });
+  // instancedMeshEntity.addComponent(Rotating, { rotatingSpeed: 0.01 });
+
+  // Создание рендерера
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+
+  // Создание stats
+  stats = new Stats();
+  container.appendChild(stats.dom);
+
+  // Обработка изменения размера окна
+  window.addEventListener("resize", onWindowResize, false);
+
+  // Анимация
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    const elapsedTime = clock.elapsedTime;
+
+    // console.time("render");
+    world.execute(delta, elapsedTime);
+    // console.timeEnd("render");
+
+    stats.update();
+    renderer.render(scene, camera);
+  }
+
+  animate();
 }
 
-function loadModel(url, isRed, numModels) {
-  const loader = new GLTFLoader();
-  loader.load(url, (gltf) => {
-    if (isRed) {
-      xbotmodelRedClone = gltf.scene;
-    } else {
-      xbotmodelWhiteClone = gltf.scene;
-    }
-
-    animations = gltf.animations;
-
-    setupDefaultScene(isRed, numModels, true);
-  });
-}
-
-function setupDefaultScene(isRed, numModels, isDefault) {
-  for (let i = 0; i < numModels; i++) {
-    let clonedModel;
-    let component;
-
-    if (isRed) {
-      clonedModel = SkeletonUtils.clone(xbotmodelRedClone);
-    } else {
-      clonedModel = SkeletonUtils.clone(xbotmodelWhiteClone);
-    }
-
-    if (isRed) {
-      component = createXbotRedEntity();
-    } else {
-      component = createXbotWhiteEntity();
-    }
-
-    if (!isDefault) {
-      let randomI = Math.floor(Math.random() * 10);
-
-      if (isRed) {
-        clonedModel.position.z = randomI * 2 - 10;
-        clonedModel.position.x = randomI % 2 === 0 ? -20 : -18;
-      } else {
-        clonedModel.position.z = randomI * 2 - 10;
-        clonedModel.position.x = randomI % 2 === 0 ? 12 : 10;
-      }
-    }
-
-    if (isRed && isDefault) {
-      if (i >= 0 && 10 >= i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 10;
-        clonedModel.position.x = i % 2 === 0 ? -20 : -18;
-      }
-      if (i >= 10 && 20 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 30;
-        clonedModel.position.x = i % 2 === 0 ? -16 : -14;
-      }
-
-      if (i >= 20 && 30 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 50;
-        clonedModel.position.x = i % 2 === 0 ? -12 : -10;
-      }
-
-      if (i >= 30 && 40 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 70;
-        clonedModel.position.x = i % 2 === 0 ? -8 : -6;
-      }
-
-      clonedModel.rotation.y = Math.PI / 2;
-    } else if (isDefault) {
-      if (i >= 0 && 10 >= i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 10;
-        clonedModel.position.x = i % 2 === 0 ? 12 : 10;
-      }
-      if (i >= 10 && 20 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 30;
-        clonedModel.position.x = i % 2 === 0 ? 16 : 14;
-      }
-
-      if (i >= 20 && 30 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 50;
-        clonedModel.position.x = i % 2 === 0 ? 20 : 18;
-      }
-
-      if (i >= 30 && 40 > i && Infinity >= i) {
-        clonedModel.position.z = i * 2 - 70;
-        clonedModel.position.x = i % 2 === 0 ? 22 : 24;
-      }
-      clonedModel.rotation.y = -Math.PI / 2;
-    }
-
-    const mixer = new THREE.AnimationMixer(clonedModel);
-
-    mixer.clipAction(animations[2]).play();
-
-    const addEntity = {
-      object: clonedModel,
-      mixer,
-      component,
-    };
-
-    if (isRed) {
-      xbotRedEntities.push(addEntity);
-    } else {
-      xbotWhiteEntities.push(addEntity);
-    }
-
-    scene.add(clonedModel);
-  }
-}
-
-function addSceneEntity() {
-  if (!xbotmodelRedClone || !xbotmodelWhiteClone) {
-    return;
-  }
-
-  if (xbotRedEntities.length + xbotWhiteEntities.length >= maxArmy) {
-    return;
-  }
-
-  if (xbotRedEntities.length === 0 && xbotWhiteEntities.length > 0) {
-    return;
-  }
-
-  if (xbotRedEntities.length > 0 && xbotWhiteEntities.length === 0) {
-    return;
-  }
-
-  const isRed = Math.random() < 0.5;
-
-  if (xbotRedCount > 0 && isRed && xbotWhiteEntities.length >= 10) {
-    xbotRedCount -= 1;
-    setupDefaultScene(isRed, 1, false);
-  }
-
-  if (xbotWhiteCount > 0 && !isRed && xbotRedEntities.length >= 10) {
-    xbotWhiteCount -= 1;
-    setupDefaultScene(isRed, 1, false);
-  }
-}
-
-window.addEventListener("resize", () => {
-  sizes.width = window.innerWidth;
-  sizes.height = window.innerHeight;
-
-  camera.aspect = sizes.width / sizes.height;
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-
-  renderer.setSize(sizes.width, sizes.height);
+  renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.render(scene, camera);
-});
+}
