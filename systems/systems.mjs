@@ -1,3 +1,5 @@
 export { TargetSystem } from "./TargetSystem.js";
 export { MovementSystem } from "./MovementSystem.js";
-export { CollisionSystem } from "./CollisionSystem.js";
+export { AttackSystem } from "./AttackSystem.js";
+// export { CollisionSystem } from "./CollisionSystem.js";
+

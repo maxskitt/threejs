@@ -1,58 +1,56 @@
 import { System } from "ecsy";
-import { ArmyId, Target, Object3D } from "../components/components.mjs";
+import {
+  Allegiance,
+  Movement,
+  Object3D,
+  Target,
+  UID,
+} from "../components/components.mjs";
+
 export class TargetSystem extends System {
   execute(delta, time) {
-    let entities = this.queries.entities.results;
+    const units = this.queries.units.results;
+    const potentialTargets = this.queries.potentialTargets.results;
 
-    // Получаем все сущности с компонентами Target, ArmyId, Object3D
-    entities.forEach((entity) => {
-      const target = entity.getComponent(Target);
-      const armyId = entity.getComponent(ArmyId);
-      const object3D = entity.getComponent(Object3D);
+    units.forEach((unitEntity) => {
+      const objectCurrent = unitEntity.getComponent(Object3D).object;
+      const currentAllegiance = unitEntity.getComponent(Allegiance);
+      const currentMovement = unitEntity.getMutableComponent(Movement);
+      const currentTarget = unitEntity.getMutableComponent(Target);
 
-      // Ищем ближайшего врага
-      let minDistance = Infinity;
-      let nearestEnemyId = null;
-      entities.forEach((otherEntity) => {
-        if (entity !== otherEntity) {
-          const otherArmyId = otherEntity.getComponent(ArmyId);
-          const otherObject3D = otherEntity.getComponent(Object3D);
+      // Найденная ближайшая цель и расстояние до нее
+      let nearestTarget = null;
+      let nearestDistance = Infinity;
 
-          // Проверяем, что другая сущность - враг
-          if (otherArmyId.armyID !== armyId.armyID) {
-            const distance = object3D.object.position.distanceTo(
-              otherObject3D.object.position,
-            );
-
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestEnemyId = otherEntity.getComponent(Target).entityId;
-            }
-          }
+      potentialTargets.forEach((targetEntity) => {
+        const objectTarget = targetEntity.getComponent(Object3D).object;
+        const targetAllegiance = targetEntity.getComponent(Allegiance);
+        const distance = objectCurrent.position.distanceTo(
+          objectTarget.position,
+        );
+        if (
+          distance < nearestDistance &&
+          objectTarget.id !== objectCurrent.id &&
+          targetAllegiance.team !== currentAllegiance.team
+        ) {
+          nearestDistance = distance;
+          nearestTarget = objectTarget.position;
         }
       });
 
-      // Устанавливаем координаты ближайшего врага только один раз после окончания внутреннего цикла
-      if (nearestEnemyId !== null) {
-        const nearestEnemy = entities.find(
-          (e) => e.getComponent(Target).entityId === nearestEnemyId,
-        );
-
-        if (nearestEnemy) {
-          const nearestEnemyObject3D = nearestEnemy.getComponent(Object3D);
-
-          target.position.set(
-            nearestEnemyObject3D.object.position.x,
-            nearestEnemyObject3D.object.position.y,
-            nearestEnemyObject3D.object.position.z,
-          );
-        }
+      // Записать ближайшую цель в компонент Movement текущего юнита
+      if (nearestTarget) {
+        currentTarget.position = nearestTarget;
+        currentTarget.distance = nearestDistance;
+        currentTarget.active = true;
+        currentMovement.isStopped = false;
       }
     });
   }
 }
-
-// Определяем запросы для системы
 TargetSystem.queries = {
-  entities: { components: [Target, ArmyId, Object3D] },
+  units: { components: [Object3D, Allegiance, Movement, Target, UID] },
+  potentialTargets: {
+    components: [Object3D, Allegiance, Movement, Target, UID],
+  },
 };

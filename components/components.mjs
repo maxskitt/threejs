@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { Component, Types, TagComponent } from "ecsy";
+import { Component, Types } from "ecsy";
+
+export class UID extends Component {}
+
+UID.schema = {
+  uid: { type: Types.String },
+};
 
 export class Object3D extends Component {}
 
@@ -7,40 +13,44 @@ Object3D.schema = {
   object: { type: Types.Ref },
 };
 
-export class Rotating extends Component {}
-
-Rotating.schema = {
-  enabled: { type: Types.Boolean },
-  rotatingSpeed: { type: Types.Number },
-  decreasingSpeed: { type: Types.Number, default: 0.001 },
-};
-
-export class UI extends TagComponent {}
-
 export class Target extends Component {}
 Target.schema = {
-  entityId: { default: null, type: Types.Ref }, // Добавляем поле для хранения идентификатора сущности
-  position: { default: new THREE.Vector3(), type: Types.Ref },
+  position: { type: Types.Ref },
+  distance: { type: Types.Number },
+  active: { type: Types.Boolean, default: false },
 };
 
-// Определение компонента для определения армии
-export class ArmyId extends Component {}
+export class Allegiance extends Component {}
 
-// Определение схемы компонента
-ArmyId.schema = {
-  // armyID - идентификатор армии, представленный строкой
-  armyID: { type: Types.String },
+Allegiance.schema = {
+  team: { type: Types.String },
 };
 
-// Ваш компонент перемещения
 export class Movement extends Component {}
 Movement.schema = {
-  speed: { default: 1, type: Types.Number }, // Скорость перемещения по умолчанию
-  isStopped: { default: false, type: Types.Boolean }, // По умолчанию объект не остановлен
+  speed: { default: 1, type: Types.Number },
+  targetPosition: { default: null, type: Types.Ref },
+  isStopped: { default: false, type: Types.Boolean },
 };
 
-export class Collision extends Component {}
-Collision.schema = {
-  radius: { default: 1, type: Types.Number }, // Радиус коллизии
-  collidedEntities: { default: [], type: Types.Array }, // Список сущностей, с которыми произошла коллизия
+export class Collider extends Component {}
+Collider.schema = {
+  width: { default: 0, type: Types.Number },
+  height: { default: 0, type: Types.Number },
+  radius: { default: 0.5, type: Types.Number },
+};
+
+export class Health extends Component {}
+Health.schema = {
+  hp: { default: 10, type: Types.Number },
+  maxHp: { default: 10, type: Types.Number }, // Maximum hit points
+  isAlive: { default: true, type: Types.Boolean }, // Indicates if the entity is alive
+};
+
+export class Attack extends Component {}
+Attack.schema = {
+  range: { default: 1, type: Types.Number },
+  damage: { default: 1, type: Types.Number },
+  cooldown: { default: 1, type: Types.Number },
+  lastAttackTime: { default: 0, type: Types.Number }, // Время последней атаки, по умолчанию 0
 };

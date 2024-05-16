@@ -3,41 +3,39 @@ import { World } from "ecsy";
 import Stats from "stats.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
-  TargetSystem,
-  MovementSystem,
-  CollisionSystem,
-} from "./systems/systems.mjs";
-import {
-  ArmyId,
   Movement,
   Object3D,
   Target,
-  UI,
-  Collision,
+  Collider,
+  Allegiance,
+  UID,
+  Attack,
+  Health,
 } from "./components/components.mjs";
-
-// For debugging
-import * as Components from "./components/components.mjs";
-window.Components = Components;
-import * as Systems from "./systems/systems.mjs";
-
-window.Systems = Systems;
-window.THREE = THREE;
+import {
+  AttackSystem,
+  MovementSystem,
+  TargetSystem
+  // CollisionSystem,
+} from "./systems/systems.mjs";
 
 let world = new World();
 
 world
   .registerComponent(Object3D)
   .registerComponent(Target)
-  .registerComponent(UI)
+  .registerComponent(UID)
   .registerComponent(Movement)
-  .registerComponent(Collision)
-  .registerComponent(ArmyId);
+  .registerComponent(Attack)
+  .registerComponent(Health)
+  .registerComponent(Collider)
+  .registerComponent(Allegiance);
 
 world
   .registerSystem(TargetSystem)
   .registerSystem(MovementSystem)
-  .registerSystem(CollisionSystem);
+  .registerSystem(AttackSystem);
+//   .registerSystem(CollisionSystem);
 
 let scene, camera, renderer, stats, clock, controls;
 
@@ -68,22 +66,24 @@ function init() {
   const geometryGreen = new THREE.BoxGeometry();
   const materialGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 1; i++) {
     const cubeGreen = new THREE.Mesh(geometryGreen, materialGreen);
-    cubeGreen.position.set(
-      Math.random() * 200 - 100,
-      Math.random() * 200 - 100,
-      Math.random() * 200 - 100,
-    ); // Случайные координаты
+    // cubeGreen.position.set(
+    //   Math.random() * 200 - 100,
+    //   Math.random() * 200 - 100,
+    //   Math.random() * 200 - 100,
+    // ); // Случайные координаты
 
     // Создаем сущность для зеленого куба
     const cubeEntity = world.createEntity();
     cubeEntity.addComponent(Object3D, { object: cubeGreen });
-    cubeEntity.addComponent(ArmyId, { armyID: "green" });
-    cubeEntity.addComponent(UI);
+    cubeEntity.addComponent(Allegiance, { team: "green" });
+    cubeEntity.addComponent(UID, { uid: `green-${i}` });
+    cubeEntity.addComponent(Attack);
+    cubeEntity.addComponent(Health);
     cubeEntity.addComponent(Movement);
-    cubeEntity.addComponent(Collision);
-    cubeEntity.addComponent(Target, { entityId: i });
+    cubeEntity.addComponent(Collider, { width: 1, height: 1 });
+    cubeEntity.addComponent(Target);
 
     scene.add(cubeGreen);
   }
@@ -91,23 +91,26 @@ function init() {
   // Создаем красный куб
   const geometryRed = new THREE.BoxGeometry();
   const materialRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-
-  for (let i = 0; i < 10; i++) {
+  //
+  for (let i = 0; i < 1; i++) {
     const cubeRed = new THREE.Mesh(geometryRed, materialRed);
-    cubeRed.position.set(
-      Math.random() * 200 - 100,
-      Math.random() * 200 - 100,
-      Math.random() * 200 - 100,
-    ); // Случайные координаты
+    cubeRed.position.set(10, 0, 0);
+    // cubeRed.position.set(
+    //   Math.random() * 200 - 100,
+    //   Math.random() * 200 - 100,
+    //   Math.random() * 200 - 100,
+    // ); // Случайные координаты
 
     // Создаем сущность для красного куба
     const cubeEntityRed = world.createEntity();
     cubeEntityRed.addComponent(Object3D, { object: cubeRed });
-    cubeEntityRed.addComponent(ArmyId, { armyID: "red" });
-    cubeEntityRed.addComponent(UI);
+    cubeEntityRed.addComponent(Allegiance, { team: "red" });
+    cubeEntityRed.addComponent(UID, { uid: `red-${i}` });
+    cubeEntityRed.addComponent(Attack);
+    cubeEntityRed.addComponent(Health);
     cubeEntityRed.addComponent(Movement);
-    cubeEntityRed.addComponent(Collision);
-    cubeEntityRed.addComponent(Target, { entityId: i + 10 });
+    cubeEntityRed.addComponent(Collider, { width: 1, height: 1 });
+    cubeEntityRed.addComponent(Target);
 
     scene.add(cubeRed);
   }
