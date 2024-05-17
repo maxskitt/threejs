@@ -6,6 +6,7 @@ import {
   Target,
   UID,
 } from "../components/components.mjs";
+import { handleObjectByType } from "../utils/checkObjectType";
 
 export class TargetSystem extends System {
   execute(delta, time) {
@@ -18,34 +19,47 @@ export class TargetSystem extends System {
       const currentMovement = unitEntity.getMutableComponent(Movement);
       const currentTarget = unitEntity.getMutableComponent(Target);
 
-      // Найденная ближайшая цель и расстояние до нее
-      let nearestTarget = null;
-      let nearestDistance = Infinity;
+      const typeObject = handleObjectByType(objectCurrent);
 
-      potentialTargets.forEach((targetEntity) => {
-        const objectTarget = targetEntity.getComponent(Object3D).object;
-        const targetAllegiance = targetEntity.getComponent(Allegiance);
-        const distance = objectCurrent.position.distanceTo(
-          objectTarget.position,
+      // Найденная ближайшая цель и расстояние до нее
+      let { nearestTarget, nearestUUID, nearestDistance } =
+        this.findNearestTarget(
+          objectCurrent,
+          currentAllegiance,
+          potentialTargets,
         );
-        if (
-          distance < nearestDistance &&
-          objectTarget.id !== objectCurrent.id &&
-          targetAllegiance.team !== currentAllegiance.team
-        ) {
-          nearestDistance = distance;
-          nearestTarget = objectTarget.position;
-        }
-      });
 
       // Записать ближайшую цель в компонент Movement текущего юнита
       if (nearestTarget) {
         currentTarget.position = nearestTarget;
         currentTarget.distance = nearestDistance;
+        currentTarget.uuid = nearestUUID;
         currentTarget.active = true;
-        currentMovement.isStopped = false;
       }
     });
+  }
+
+  findNearestTarget(objectCurrent, currentAllegiance, potentialTargets) {
+    let nearestTarget = null;
+    let nearestUUID = null;
+    let nearestDistance = Infinity;
+
+    potentialTargets.forEach((targetEntity) => {
+      const objectTarget = targetEntity.getComponent(Object3D).object;
+      const targetAllegiance = targetEntity.getComponent(Allegiance);
+      const distance = objectCurrent.position.distanceTo(objectTarget.position);
+      if (
+        distance < nearestDistance &&
+        objectTarget.id !== objectCurrent.id &&
+        targetAllegiance.team !== currentAllegiance.team
+      ) {
+        nearestDistance = distance;
+        nearestTarget = objectTarget.position;
+        nearestUUID = objectTarget.id;
+      }
+    });
+
+    return { nearestTarget, nearestUUID, nearestDistance };
   }
 }
 TargetSystem.queries = {

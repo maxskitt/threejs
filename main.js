@@ -13,9 +13,10 @@ import {
   Health,
 } from "./components/components.mjs";
 import {
+  AliveCheckSystem,
   AttackSystem,
   MovementSystem,
-  TargetSystem
+  TargetSystem,
   // CollisionSystem,
 } from "./systems/systems.mjs";
 
@@ -34,6 +35,7 @@ world
 world
   .registerSystem(TargetSystem)
   .registerSystem(MovementSystem)
+  .registerSystem(AliveCheckSystem)
   .registerSystem(AttackSystem);
 //   .registerSystem(CollisionSystem);
 
@@ -68,6 +70,7 @@ function init() {
 
   for (let i = 0; i < 1; i++) {
     const cubeGreen = new THREE.Mesh(geometryGreen, materialGreen);
+    cubeGreen.position.set(-16, 0, 0);
     // cubeGreen.position.set(
     //   Math.random() * 200 - 100,
     //   Math.random() * 200 - 100,
@@ -91,10 +94,10 @@ function init() {
   // Создаем красный куб
   const geometryRed = new THREE.BoxGeometry();
   const materialRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  //
+
   for (let i = 0; i < 1; i++) {
     const cubeRed = new THREE.Mesh(geometryRed, materialRed);
-    cubeRed.position.set(10, 0, 0);
+    cubeRed.position.set(-22, 0, 0);
     // cubeRed.position.set(
     //   Math.random() * 200 - 100,
     //   Math.random() * 200 - 100,
@@ -113,32 +116,36 @@ function init() {
     cubeEntityRed.addComponent(Target);
 
     scene.add(cubeRed);
+    
+    console.log(cubeRed, "cubeRed");
   }
 
-  // const geometry = new THREE.BoxGeometry();
-  // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Укажите свой материал
-  // const count = 50; // Укажите количество экземпляров
-  // const mesh = new THREE.InstancedMesh(geometry, material, count);
+
+  const geometry = new THREE.BoxGeometry();
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const count = 50000;
+  const mesh = new THREE.InstancedMesh(geometry, material, count);
 
   // Создаем массив матриц трансформации
-  // const offsets = [];
-  // for (let i = 0; i < count; i++) {
-  //   const matrix = new THREE.Matrix4();
-  // Добавляем смещение для каждого экземпляра
-  // matrix.makeTranslation(i * 2, 0, 0); // Пример: смещение на i * 2 по оси X
-  // offsets.push(matrix);
-  // }
+  const offsets = [];
+  for (let i = 0; i < count; i++) {
+    const matrix = new THREE.Matrix4();
 
-  // Устанавливаем матрицы трансформации для экземпляров
-  //   for (let i = 0; i < count; i++) {
-  //     mesh.setMatrixAt(i, offsets[i]);
-  //   }
-  //
-  //   scene.add(mesh); // Добавьте InstancedMesh к сцене
+    matrix.makeTranslation(i * 2, 0, 0);
+    offsets.push(matrix);
+  }
 
-  // const instancedMeshEntity = world.createEntity();
-  // instancedMeshEntity.addComponent(Object3D, { object: mesh });
-  // instancedMeshEntity.addComponent(Rotating, { rotatingSpeed: 0.01 });
+  for (let i = 0; i < count; i++) {
+    mesh.setMatrixAt(i, offsets[i]);
+  }
+
+  scene.add(mesh);
+
+
+  console.log(mesh, "mesh");
+
+  const instancedMeshEntity = world.createEntity();
+  instancedMeshEntity.addComponent(Object3D, { object: mesh });
 
   // Создание рендерера
   renderer = new THREE.WebGLRenderer();
@@ -161,6 +168,8 @@ function init() {
 
     const delta = clock.getDelta();
     const elapsedTime = clock.elapsedTime;
+
+    // console.log(world, "world");
 
     // console.time("render");
     world.execute(delta, elapsedTime);

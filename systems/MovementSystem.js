@@ -10,9 +10,11 @@ export class MovementSystem extends System {
       const movement = entity.getComponent(Movement);
       const target = entity.getComponent(Target);
 
-      if (movement.isStopped || !target.active) {
+      if (movement.isStopped || !target.uuid) {
         return;
       }
+      // const foundObject = object.uuid === target.uuid;
+
 
       const targetPosition = target.position;
       const direction = targetPosition.clone().sub(object.position).normalize();

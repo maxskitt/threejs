@@ -15,6 +15,7 @@ Object3D.schema = {
 
 export class Target extends Component {}
 Target.schema = {
+  uuid: { type: Types.String, default: null },
   position: { type: Types.Ref },
   distance: { type: Types.Number },
   active: { type: Types.Boolean, default: false },
