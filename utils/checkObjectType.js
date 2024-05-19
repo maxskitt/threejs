@@ -1,6 +1,6 @@
 function handleObjectByType(objectTarget) {
   const typeMapping = {
-    isMesh: objectTarget.isMesh,
+    // isMesh: objectTarget.isMesh,
     isInstancedMesh: objectTarget.isInstancedMesh,
     isGroup: objectTarget.isGroup,
   };

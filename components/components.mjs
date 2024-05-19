@@ -21,6 +21,12 @@ Target.schema = {
   active: { type: Types.Boolean, default: false },
 };
 
+export class TargetInstance extends Component {}
+TargetInstance.schema = {
+  targetUUID: { type: Types.String, default: null },
+  targetID: { type: Types.Array, default: [] },
+};
+
 export class Allegiance extends Component {}
 
 Allegiance.schema = {

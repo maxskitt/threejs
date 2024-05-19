@@ -1,70 +1,110 @@
+import * as THREE from "three";
+import { Octree } from "three/addons/math/Octree.js";
 import { System } from "ecsy";
-import {
-  Allegiance,
-  Movement,
-  Object3D,
-  Target,
-  UID,
-} from "../components/components.mjs";
+import { TargetInstance, Object3D } from "../components/components.mjs";
 import { handleObjectByType } from "../utils/checkObjectType";
+import { kdTree } from "kd-tree-javascript";
 
 export class TargetSystem extends System {
   execute(delta, time) {
-    const units = this.queries.units.results;
-    const potentialTargets = this.queries.potentialTargets.results;
+    let entities = this.queries.targets.results;
 
-    units.forEach((unitEntity) => {
-      const objectCurrent = unitEntity.getComponent(Object3D).object;
-      const currentAllegiance = unitEntity.getComponent(Allegiance);
-      const currentMovement = unitEntity.getMutableComponent(Movement);
-      const currentTarget = unitEntity.getMutableComponent(Target);
+    // Собираем все InstancedMesh из сущностей
+    const instancedMeshes = [];
+    entities.forEach((entity) => {
+      const object = entity.getComponent(Object3D).object;
+      const typeObject = handleObjectByType(object);
 
-      const typeObject = handleObjectByType(objectCurrent);
+      if (typeObject === "isInstancedMesh") {
+        instancedMeshes.push(object);
 
-      // Найденная ближайшая цель и расстояние до нее
-      let { nearestTarget, nearestUUID, nearestDistance } =
-        this.findNearestTarget(
-          objectCurrent,
-          currentAllegiance,
-          potentialTargets,
-        );
 
-      // Записать ближайшую цель в компонент Movement текущего юнита
-      if (nearestTarget) {
-        currentTarget.position = nearestTarget;
-        currentTarget.distance = nearestDistance;
-        currentTarget.uuid = nearestUUID;
-        currentTarget.active = true;
-      }
-    });
-  }
-
-  findNearestTarget(objectCurrent, currentAllegiance, potentialTargets) {
-    let nearestTarget = null;
-    let nearestUUID = null;
-    let nearestDistance = Infinity;
-
-    potentialTargets.forEach((targetEntity) => {
-      const objectTarget = targetEntity.getComponent(Object3D).object;
-      const targetAllegiance = targetEntity.getComponent(Allegiance);
-      const distance = objectCurrent.position.distanceTo(objectTarget.position);
-      if (
-        distance < nearestDistance &&
-        objectTarget.id !== objectCurrent.id &&
-        targetAllegiance.team !== currentAllegiance.team
-      ) {
-        nearestDistance = distance;
-        nearestTarget = objectTarget.position;
-        nearestUUID = objectTarget.id;
       }
     });
 
-    return { nearestTarget, nearestUUID, nearestDistance };
+    // Обновляем цели для каждого InstancedMesh
+    instancedMeshes.forEach((sourceMesh) => {
+      const nearestInstances = updateTargetsForInstancedMesh(
+        sourceMesh,
+        instancedMeshes,
+      );
+
+      // Записываем найденные экземпляры в компонент TargetInstance
+      // const targetInstance = entity.getMutableComponent(TargetInstance);
+      // targetInstance.targetID = nearestInstances;
+
+      nearestInstances.forEach(
+        ({ sourceInstanceId, targetMeshIndex, targetInstanceId, position }) => {
+          console.log(
+            `Source Instance ID: ${sourceInstanceId} is nearest to Target Mesh Index: ${targetMeshIndex}, Target Instance ID: ${targetInstanceId} at Position:`,
+            position,
+          );
+        },
+      );
+    });
   }
 }
+
+function updateTargetsForInstancedMesh(sourceMesh, targetMeshes) {
+  const sourceCount = sourceMesh.count;
+  const sourcePoints = [];
+  const dummy = new THREE.Object3D(); // Вспомогательный объект для получения позиции экземпляра
+
+  // Сборка точек из sourceMesh
+  for (let i = 0; i < sourceCount; i++) {
+    sourceMesh.getMatrixAt(i, dummy.matrix);
+    dummy.matrix.decompose(dummy.position, dummy.rotation, dummy.scale);
+    sourcePoints.push([
+      dummy.position.x,
+      dummy.position.y,
+      dummy.position.z,
+      i,
+    ]);
+  }
+
+  // Построение K-D дерева для sourcePoints
+  const distance = (a, b) => {
+    return Math.sqrt(
+      (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2,
+    );
+  };
+
+  const kdtree = new kdTree(sourcePoints, distance, [0, 1, 2]);
+
+  const nearestInstances = [];
+
+  // Поиск ближайших точек из sourceMesh для каждого экземпляра из targetMeshes
+  targetMeshes.forEach((targetMesh, meshIndex) => {
+    if (targetMesh === sourceMesh) return; // Пропускаем сам источник
+
+    const targetCount = targetMesh.count;
+
+    for (let i = 0; i < targetCount; i++) {
+      targetMesh.getMatrixAt(i, dummy.matrix);
+      dummy.matrix.decompose(dummy.position, dummy.rotation, dummy.scale);
+      const nearest = kdtree.nearest(
+        [dummy.position.x, dummy.position.y, dummy.position.z],
+        1,
+      );
+
+      if (nearest.length > 0) {
+        const nearestPoint = nearest[0][0];
+        const nearestInstanceId = nearestPoint[3];
+
+
+        nearestInstances.push({
+          sourceInstanceId: nearestInstanceId,
+          targetMeshIndex: meshIndex,
+          targetInstanceId: i,
+          position: dummy.position.clone(),
+        });
+      }
+    }
+  });
+
+  return nearestInstances;
+}
+
 TargetSystem.queries = {
-  units: { components: [Object3D, Allegiance, Movement, Target, UID] },
-  potentialTargets: {
-    components: [Object3D, Allegiance, Movement, Target, UID],
-  },
+  targets: { components: [Object3D, TargetInstance] },
 };

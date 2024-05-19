@@ -11,6 +11,7 @@ import {
   UID,
   Attack,
   Health,
+  TargetInstance,
 } from "./components/components.mjs";
 import {
   AliveCheckSystem,
@@ -25,6 +26,7 @@ let world = new World();
 world
   .registerComponent(Object3D)
   .registerComponent(Target)
+  .registerComponent(TargetInstance)
   .registerComponent(UID)
   .registerComponent(Movement)
   .registerComponent(Attack)
@@ -64,88 +66,70 @@ function init() {
   // Направляем камеру на центр сцены
   camera.lookAt(0, 0, 0);
 
-  // Создаем зеленый куб
-  const geometryGreen = new THREE.BoxGeometry();
-  const materialGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-
-  for (let i = 0; i < 1; i++) {
-    const cubeGreen = new THREE.Mesh(geometryGreen, materialGreen);
-    cubeGreen.position.set(-16, 0, 0);
-    // cubeGreen.position.set(
-    //   Math.random() * 200 - 100,
-    //   Math.random() * 200 - 100,
-    //   Math.random() * 200 - 100,
-    // ); // Случайные координаты
-
-    // Создаем сущность для зеленого куба
-    const cubeEntity = world.createEntity();
-    cubeEntity.addComponent(Object3D, { object: cubeGreen });
-    cubeEntity.addComponent(Allegiance, { team: "green" });
-    cubeEntity.addComponent(UID, { uid: `green-${i}` });
-    cubeEntity.addComponent(Attack);
-    cubeEntity.addComponent(Health);
-    cubeEntity.addComponent(Movement);
-    cubeEntity.addComponent(Collider, { width: 1, height: 1 });
-    cubeEntity.addComponent(Target);
-
-    scene.add(cubeGreen);
-  }
-
-  // Создаем красный куб
+  // Красный
   const geometryRed = new THREE.BoxGeometry();
   const materialRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const countRed = 1;
+  const meshRed = new THREE.InstancedMesh(geometryRed, materialRed, countRed);
 
-  for (let i = 0; i < 1; i++) {
-    const cubeRed = new THREE.Mesh(geometryRed, materialRed);
-    cubeRed.position.set(-22, 0, 0);
-    // cubeRed.position.set(
-    //   Math.random() * 200 - 100,
-    //   Math.random() * 200 - 100,
-    //   Math.random() * 200 - 100,
-    // ); // Случайные координаты
+  // Зелёный
+  const geometryGreen = new THREE.BoxGeometry();
+  const materialGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  const countGreen = 100;
+  const meshGreen = new THREE.InstancedMesh(
+    geometryGreen,
+    materialGreen,
+    countGreen,
+  );
 
-    // Создаем сущность для красного куба
-    const cubeEntityRed = world.createEntity();
-    cubeEntityRed.addComponent(Object3D, { object: cubeRed });
-    cubeEntityRed.addComponent(Allegiance, { team: "red" });
-    cubeEntityRed.addComponent(UID, { uid: `red-${i}` });
-    cubeEntityRed.addComponent(Attack);
-    cubeEntityRed.addComponent(Health);
-    cubeEntityRed.addComponent(Movement);
-    cubeEntityRed.addComponent(Collider, { width: 1, height: 1 });
-    cubeEntityRed.addComponent(Target);
-
-    scene.add(cubeRed);
-    
-    console.log(cubeRed, "cubeRed");
-  }
-
-
-  const geometry = new THREE.BoxGeometry();
-  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  const count = 50000;
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
-
-  // Создаем массив матриц трансформации
+  // Создаем массив матриц трансформации и применяем их для всех наборов
+  const offsetsR = [];
   const offsets = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < countRed; i++) {
     const matrix = new THREE.Matrix4();
-
-    matrix.makeTranslation(i * 2, 0, 0);
+    matrix.makeTranslation(i * 2, 2, 0);
     offsets.push(matrix);
   }
 
-  for (let i = 0; i < count; i++) {
-    mesh.setMatrixAt(i, offsets[i]);
+  for (let i = 0; i < countGreen; i++) {
+    const matrix = new THREE.Matrix4();
+
+    matrix.makeTranslation(i * 2, 0, 0);
+    offsetsR.push(matrix);
   }
 
-  scene.add(mesh);
+  for (let i = 0; i < countRed; i++) {
+    meshRed.setMatrixAt(i, offsets[i]);
 
+  }
+  for (let i = 0; i < countGreen; i++) {
+    meshGreen.setMatrixAt(i, offsetsR[i]);
 
-  console.log(mesh, "mesh");
+  }
+
+  scene.add(meshRed);
+  scene.add(meshGreen);
+
+  console.log(meshRed, "meshRed");
+
 
   const instancedMeshEntity = world.createEntity();
-  instancedMeshEntity.addComponent(Object3D, { object: mesh });
+  instancedMeshEntity
+    .addComponent(Object3D, { object: meshGreen })
+    .addComponent(TargetInstance, {
+      targetID: new Array(countGreen).fill(null),
+    })
+    .addComponent(Movement);
+
+  const instancedMeshEntityR = world.createEntity();
+  instancedMeshEntityR
+    .addComponent(Object3D, { object: meshRed })
+    .addComponent(TargetInstance, {
+      targetID: new Array(countRed).fill(null),
+    })
+    .addComponent(Movement);
+
+  console.log(world, "meshGreen");
 
   // Создание рендерера
   renderer = new THREE.WebGLRenderer();
